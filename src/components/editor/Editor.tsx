@@ -22,6 +22,7 @@ type EditorProps = {
 
 export default function Editor({ content, onChange, editable = true }: EditorProps) {
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({ codeBlock: false }),
       CodeBlockLowlight.configure({ lowlight }),
@@ -52,8 +53,7 @@ export default function Editor({ content, onChange, editable = true }: EditorPro
     <div className="tiptap-wrapper h-full" onKeyDown={handleKeyDown}>
       <EditorContent
         editor={editor}
-        className="tiptap h-full px-8 py-6 text-sm leading-relaxed"
-        style={{ color: "var(--text)" }}
+        className="tiptap h-full text-text min-h-[500px]"
       />
     </div>
   );

@@ -39,14 +39,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
+    <div className="min-h-screen flex items-center justify-center bg-bg text-text selection:bg-accent/20">
       <div className="w-full max-w-sm px-6">
         {/* Logo */}
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "var(--text)" }}>
+        <div className="mb-10 text-center flex flex-col items-center">
+          <div className="w-12 h-12 rounded-xl bg-accent text-white flex items-center justify-center font-bold text-2xl tracking-tighter mb-4 shadow-sm">N</div>
+          <h1 className="text-2xl font-semibold tracking-tight text-text">
             Nexus
           </h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+          <p className="mt-2 text-sm text-muted">
             Your personal knowledge base
           </p>
         </div>
@@ -60,17 +61,12 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoFocus
-              className="w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors"
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                color: "var(--text)",
-              }}
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all bg-surface border border-border text-text focus:ring-2 focus:ring-accent/20 focus:border-accent placeholder:text-muted/60 shadow-sm"
             />
           </div>
 
           {error && (
-            <p className="text-sm" style={{ color: "#E24B4A" }}>
+            <p className="text-sm text-red-500 font-medium text-center">
               {error}
             </p>
           )}
@@ -78,10 +74,10 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || !password}
-            className="w-full py-2.5 rounded-lg text-sm font-medium transition-opacity disabled:opacity-50"
-            style={{ background: "var(--accent)", color: "#fff" }}
+            className="w-full py-3 rounded-xl text-sm font-medium transition-all bg-accent hover:bg-accent-hover text-white shadow-sm disabled:opacity-50 flex justify-center items-center gap-2"
           >
             {loading ? "Unlocking..." : "Unlock Nexus"}
+            {!loading && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>}
           </button>
         </form>
       </div>
