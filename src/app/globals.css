@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+:root {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Light mode */
+  --bg:        #FFFFFF;
+  --surface:   #F7F7F5;
+  --border:    #E8E8E4;
+  --text:      #1A1A1A;
+  --muted:     #6B6B6B;
+  --accent:    #7C6AF7;
+  --accent-hover: #6A58E5;
+}
+
+.dark {
+  --bg:        #0F0F0F;
+  --surface:   #1A1A1A;
+  --border:    #2E2E2E;
+  --text:      #F0F0F0;
+  --muted:     #888884;
+  --accent:    #9D8FF7;
+  --accent-hover: #B0A5F9;
+}
+
+* {
+  box-sizing: border-box;
+  border-color: var(--border);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* TipTap editor styles */
+.tiptap { outline: none; min-height: 100%; }
+.tiptap p { margin: 0 0 0.75rem; line-height: 1.75; }
+.tiptap h1 { font-size: 1.75rem; font-weight: 600; margin: 1.5rem 0 0.75rem; }
+.tiptap h2 { font-size: 1.375rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
+.tiptap h3 { font-size: 1.125rem; font-weight: 600; margin: 1rem 0 0.5rem; }
+.tiptap code { font-family: var(--font-mono); font-size: 0.875em; background: var(--surface); padding: 0.15em 0.4em; border-radius: 4px; }
+.tiptap pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 1rem 0; }
+.tiptap pre code { background: none; padding: 0; font-size: 0.875rem; }
+.tiptap blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; color: var(--muted); margin: 1rem 0; }
+.tiptap ul, .tiptap ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.tiptap li { margin: 0.25rem 0; line-height: 1.75; }
+.tiptap hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+.tiptap a { color: var(--accent); text-decoration: underline; }
+
+/* Mermaid diagram container */
+.mermaid-wrapper { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin: 1rem 0; overflow-x: auto; }
