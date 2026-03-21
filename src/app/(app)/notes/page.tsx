@@ -157,6 +157,16 @@ export default function NotesPage() {
     [autoSaveEnabled, triggerApiSave]
   );
 
+  const closeActiveNote = useCallback(() => {
+    setNotes((prev) => {
+      if (!activeNote) return prev;
+      return prev.map((note) =>
+        note.id === activeNote.id ? { ...note, ...activeNote } : note
+      );
+    });
+    setActiveNote(null);
+  }, [activeNote]);
+
   const handleManualSave = async () => {
     if (!activeNote || !hasUnsavedChanges) return;
     const resolvedFileType = resolveNoteFileType({
@@ -582,9 +592,9 @@ export default function NotesPage() {
                {/* Breadcrumbs or Status indicator can go here */}
                <div className="flex items-center gap-2 text-xs text-muted">
                  <button 
-                   onClick={() => setActiveNote(null)}
+                   onClick={closeActiveNote}
                    className="md:hidden flex items-center gap-1 text-muted hover:text-text px-1 py-1 rounded-md transition-colors"
-                 >
+                  >
                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
                    Back
                  </button>
