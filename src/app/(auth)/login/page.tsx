@@ -31,6 +31,7 @@ export default function LoginPage() {
 
       // Store token for API calls
       localStorage.setItem("nexus_token", data.token);
+      localStorage.setItem("nexus_login_at", Date.now().toString());
       router.push("/notes");
     } catch {
       setError("Something went wrong. Try again.");

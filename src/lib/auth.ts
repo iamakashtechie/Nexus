@@ -8,7 +8,7 @@ function getSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-const JWT_EXPIRES_IN = "30d";
+const JWT_EXPIRES_IN = "15m";
 
 export async function signToken(): Promise<string> {
   return new SignJWT({ auth: true })
