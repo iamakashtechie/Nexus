@@ -260,7 +260,7 @@ export default function NotesPage() {
 
             {/* Note Title & Editor */}
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-3xl mx-auto px-5 md:px-8 py-4 md:py-8">
+              <div className="max-w-5xl mx-auto w-full px-5 md:px-8 py-4 min-h-full flex flex-col">
                 <input
                   data-testid="note-title"
                   type="text"
@@ -273,10 +273,13 @@ export default function NotesPage() {
                   placeholder="Note Title"
                 />
                 
-                <Editor
-                  content={activeNote.content as object}
-                  onChange={(content) => autoSave(activeNote.id, "content", content)}
-                />
+                <div className="flex-1 flex flex-col cursor-text pb-8 mt-2">
+                  <Editor
+                    key={activeNote.id}
+                    content={activeNote.content as object}
+                    onChange={(content) => autoSave(activeNote.id, "content", content)}
+                  />
+                </div>
               </div>
             </div>
           </>
