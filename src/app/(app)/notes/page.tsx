@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/useApi";
 import type { NoteWithTags } from "@/types";
+import type { Notebook } from "@prisma/client";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
+import { ContextMenu, type MenuItem } from "@/components/ui/ContextMenu";
 import dynamic from "next/dynamic";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
@@ -29,6 +31,23 @@ export default function NotesPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Notebooks / Folders
+  type NotebookWithCount = Notebook & { _count: { notes: number } };
+  const [notebooks, setNotebooks] = useState<NotebookWithCount[]>([]);
+  const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null); // null = All Notes
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renameFolderName, setRenameFolderName] = useState("");
+
+  // Context menu
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+
+  const fetchNotebooks = useCallback(async () => {
+    const res = await apiFetch<{ success: boolean; data: NotebookWithCount[] }>("/api/notebooks");
+    if (res.success) setNotebooks(res.data);
+  }, [apiFetch]);
+
   const fetchNotes = useCallback(
     async (q?: string) => {
       setLoadingNotes(true);
@@ -44,7 +63,8 @@ export default function NotesPage() {
 
   useEffect(() => {
     void fetchNotes();
-  }, [fetchNotes]);
+    void fetchNotebooks();
+  }, [fetchNotes, fetchNotebooks]);
 
   async function createNote() {
     const res = await apiFetch<{ success: boolean; data: NoteWithTags }>(
@@ -115,6 +135,68 @@ export default function NotesPage() {
     }
   }
 
+  // Notebook CRUD
+  async function createNotebook(name: string) {
+    const res = await apiFetch<{ success: boolean; data: NotebookWithCount }>("/api/notebooks", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+    if (res.success) {
+      setNotebooks(prev => [...prev, res.data]);
+    }
+    setCreatingFolder(false);
+    setNewFolderName("");
+  }
+
+  async function renameNotebook(id: string, name: string) {
+    await apiFetch(`/api/notebooks/${id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+    void fetchNotebooks();
+    setRenamingFolderId(null);
+    setRenameFolderName("");
+  }
+
+  async function deleteNotebook(id: string) {
+    if (!confirm("Delete this folder? Notes inside will become unfiled.")) return;
+    await apiFetch(`/api/notebooks/${id}`, { method: "DELETE" });
+    if (activeNotebookId === id) setActiveNotebookId(null);
+    void fetchNotebooks();
+    void fetchNotes(search);
+  }
+
+  async function moveNoteToFolder(noteId: string, notebookId: string | null) {
+    await apiFetch(`/api/notes/${noteId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ notebookId }),
+    });
+    void fetchNotes(search);
+    void fetchNotebooks();
+  }
+
+  // Note context menu builder
+  function buildNoteContextMenu(note: NoteWithTags): MenuItem[] {
+    return [
+      { label: note.pinned ? "Unpin" : "Pin", onClick: () => togglePin(note) },
+      {
+        label: "Move to Folder",
+        onClick: () => {},
+        divider: true,
+      },
+      ...notebooks.map(nb => ({
+        label: `  📁 ${nb.name}`,
+        onClick: () => moveNoteToFolder(note.id, nb.id),
+      })),
+      { label: "Delete", onClick: () => { if (confirm("Delete this note?")) deleteNote(note.id); }, danger: true, divider: true },
+    ];
+  }
+
+  // Folder context menu builder
+  function buildFolderContextMenu(nb: NotebookWithCount): MenuItem[] {
+    return [
+      { label: "Rename", onClick: () => { setRenamingFolderId(nb.id); setRenameFolderName(nb.name); } },
+      { label: "Delete Folder", onClick: () => deleteNotebook(nb.id), danger: true, divider: true },
+    ];
+  }
+
   async function logout() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -124,9 +206,12 @@ export default function NotesPage() {
     }
   }
 
-  const filtered = notes.filter((n) =>
-    n.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = notes
+    .filter(n => n.title.toLowerCase().includes(search.toLowerCase()))
+    .filter(n => {
+      if (activeNotebookId === null) return true;
+      return n.notebookId === activeNotebookId;
+    });
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg text-text selection:bg-accent/20 selection:text-text">
@@ -177,10 +262,81 @@ export default function NotesPage() {
           </div>
         </div>
 
+        {/* Folders */}
+        <div className="px-2 pt-2 pb-1">
+          <div className="px-2 pb-1">
+            <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider">Folders</h3>
+          </div>
+          <button
+            onClick={() => setActiveNotebookId(null)}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-md transition-colors ${
+              activeNotebookId === null ? 'bg-surface-hover/80 text-text font-medium' : 'text-muted hover:bg-surface-hover/50 hover:text-text'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            All Notes
+          </button>
+          {notebooks.map(nb => (
+            <div key={nb.id} className="group">
+              {renamingFolderId === nb.id ? (
+                <form
+                  className="flex items-center gap-1 px-3 py-1"
+                  onSubmit={(e) => { e.preventDefault(); if (renameFolderName.trim()) renameNotebook(nb.id, renameFolderName.trim()); }}
+                >
+                  <input
+                    autoFocus
+                    value={renameFolderName}
+                    onChange={e => setRenameFolderName(e.target.value)}
+                    onBlur={() => { setRenamingFolderId(null); setRenameFolderName(""); }}
+                    className="flex-1 text-xs bg-transparent outline-none border-b border-border text-text py-0.5"
+                  />
+                </form>
+              ) : (
+                <button
+                  onClick={() => setActiveNotebookId(nb.id)}
+                  onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: buildFolderContextMenu(nb) }); }}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs rounded-md transition-colors ${
+                    activeNotebookId === nb.id ? 'bg-surface-hover/80 text-text font-medium' : 'text-muted hover:bg-surface-hover/50 hover:text-text'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+                    {nb.name}
+                  </span>
+                  <span className="text-[10px] text-muted/50 tabular-nums">{nb._count.notes}</span>
+                </button>
+              )}
+            </div>
+          ))}
+          {creatingFolder ? (
+            <form
+              className="flex items-center gap-1 px-3 py-1"
+              onSubmit={(e) => { e.preventDefault(); if (newFolderName.trim()) createNotebook(newFolderName.trim()); }}
+            >
+              <input
+                autoFocus
+                placeholder="Folder name"
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                onBlur={() => { setCreatingFolder(false); setNewFolderName(""); }}
+                className="flex-1 text-xs bg-transparent outline-none border-b border-border text-text py-0.5 placeholder:text-muted/50"
+              />
+            </form>
+          ) : (
+            <button
+              onClick={() => setCreatingFolder(true)}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted/50 hover:text-muted hover:bg-surface-hover/50 rounded-md transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+              New Folder
+            </button>
+          )}
+        </div>
+
         {/* Notes list */}
         <div className="flex-1 overflow-y-auto px-2 pb-4 pt-2">
           <div className="px-2 pb-1">
-            <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider">Your Notes</h3>
+            <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider">Notes</h3>
           </div>
           {loadingNotes ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted">
@@ -199,6 +355,10 @@ export default function NotesPage() {
               onClick={() => {
                 setActiveNote(note);
                 setIsEditing(false);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setCtxMenu({ x: e.clientX, y: e.clientY, items: buildNoteContextMenu(note) });
               }}
               className={`group relative flex items-start gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-all mb-0.5 ${
                 activeNote?.id === note.id
@@ -220,10 +380,19 @@ export default function NotesPage() {
                 </div>
               </div>
 
-              {/* Actions */}
+              {/* Actions: three-dot on mobile, hover actions on desktop */}
+              <button
+                className="md:hidden p-1 text-muted"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const rect = (e.target as HTMLElement).getBoundingClientRect();
+                  setCtxMenu({ x: rect.left, y: rect.bottom, items: buildNoteContextMenu(note) });
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+              </button>
               <div className="hidden group-hover:flex items-center gap-1 shrink-0 bg-gradient-to-l from-surface-hover pl-4 pr-1">
                 <button
-                  data-testid="note-menu"
                   onClick={(e) => { e.stopPropagation(); togglePin(note); }}
                   className="text-muted hover:text-accent p-1 rounded-md transition-colors"
                   title={note.pinned ? "Unpin" : "Pin"}
@@ -231,21 +400,26 @@ export default function NotesPage() {
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill={note.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
                 </button>
                 <button
-                  data-testid="delete-note"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (confirm("Delete this note?")) deleteNote(note.id);
+                    const rect = (e.target as HTMLElement).getBoundingClientRect();
+                    setCtxMenu({ x: rect.left, y: rect.bottom, items: buildNoteContextMenu(note) });
                   }}
-                  className="text-muted hover:text-red-500 p-1 rounded-md transition-colors"
-                  title="Delete"
+                  className="text-muted hover:text-text p-1 rounded-md transition-colors"
+                  title="More"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                 </button>
               </div>
             </div>
           ))}
         </div>
       </aside>
+
+      {/* Context Menu Portal */}
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />
+      )}
 
       {/* Editor area */}
       <main className={`flex-1 flex-col overflow-hidden bg-bg relative w-full ${!activeNote ? 'hidden md:flex' : 'flex'}`}>
@@ -262,7 +436,7 @@ export default function NotesPage() {
                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
                    Back
                  </button>
-                 <span className="hidden md:inline">Personal</span>
+                 <span className="hidden md:inline">{activeNote.notebook?.name || "All Notes"}</span>
                  <span className="hidden md:inline text-border">/</span>
                  <span className="text-text font-medium truncate max-w-[120px] md:max-w-xs">{activeNote.title || "Untitled"}</span>
                </div>
