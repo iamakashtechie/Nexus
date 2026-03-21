@@ -20,18 +20,23 @@ export default function NotesPage() {
   const router = useRouter();
   const { apiFetch } = useApi();
   const [notes, setNotes] = useState<NoteWithTags[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(true);
   const [activeNote, setActiveNote] = useState<NoteWithTags | null>(null);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchNotes = useCallback(
     async (q?: string) => {
+      setLoadingNotes(true);
       const params = q ? `?q=${encodeURIComponent(q)}` : "";
       const res = await apiFetch<{ success: boolean; data: NoteWithTags[] }>(
         `/api/notes${params}`
       );
       if (res.success) setNotes(res.data);
+      setLoadingNotes(false);
     },
     [apiFetch]
   );
@@ -57,22 +62,36 @@ export default function NotesPage() {
     }
   }
 
+  const triggerApiSave = useCallback(async (noteId: string, payload: any) => {
+    setSaving(true);
+    await apiFetch(`/api/notes/${noteId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    setSaving(false);
+    setHasUnsavedChanges(false);
+    void fetchNotes(search);
+  }, [apiFetch, fetchNotes, search]);
+
   const autoSave = useCallback(
     (noteId: string, field: "title" | "content", value: unknown) => {
+      setHasUnsavedChanges(true); // Always mark as unsaved on any edit
+      if (!autoSaveEnabled) return;
+
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       setSaving(true);
-      const t = setTimeout(async () => {
-        await apiFetch(`/api/notes/${noteId}`, {
-          method: "PATCH",
-          body: JSON.stringify({ [field]: value }),
-        });
-        setSaving(false);
-        void fetchNotes(search);
+      const t = setTimeout(() => {
+        void triggerApiSave(noteId, { [field]: value });
       }, 800);
       saveTimeoutRef.current = t;
     },
-    [apiFetch, fetchNotes, search]
+    [autoSaveEnabled, triggerApiSave]
   );
+
+  const handleManualSave = async () => {
+    if (!activeNote || !hasUnsavedChanges) return;
+    await triggerApiSave(activeNote.id, { title: activeNote.title, content: activeNote.content });
+  };
 
   async function deleteNote(id: string) {
     await apiFetch(`/api/notes/${id}`, { method: "DELETE" });
@@ -161,12 +180,17 @@ export default function NotesPage() {
           <div className="px-2 pb-1">
             <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider">Your Notes</h3>
           </div>
-          {filtered.length === 0 && (
+          {loadingNotes ? (
+            <div className="flex flex-col items-center justify-center py-8 text-muted">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+              <p className="text-xs mt-1">Fetching notes...</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-50"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
               <p className="text-xs">No notes found</p>
             </div>
-          )}
+          ) : null}
           {filtered.map((note) => (
             <div
               key={note.id}
@@ -239,11 +263,33 @@ export default function NotesPage() {
                </div>
                
                <div className="flex items-center gap-3">
-                 <span className="text-[11px] text-muted flex items-center gap-1.5">
+                 <label className="flex items-center gap-1.5 cursor-pointer text-xs text-muted hover:text-text transition-colors" title="Toggle Auto-Save">
+                   <input 
+                     type="checkbox" 
+                     checked={autoSaveEnabled}
+                     onChange={(e) => {
+                       setAutoSaveEnabled(e.target.checked);
+                       if (e.target.checked && hasUnsavedChanges && activeNote) {
+                         void triggerApiSave(activeNote.id, { title: activeNote.title, content: activeNote.content });
+                       }
+                     }}
+                     className="accent-accent w-3 h-3 cursor-pointer"
+                   />
+                   Auto-Save
+                 </label>
+
+                 <div className="w-px h-3 bg-border mx-1"></div>
+
+                 <span className="text-[11px] text-muted flex items-center gap-1.5 min-w-[60px] justify-end">
                    {saving ? (
                      <>
                        <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
                        Saving...
+                     </>
+                   ) : hasUnsavedChanges ? (
+                     <>
+                       <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+                       Unsaved
                      </>
                    ) : (
                      <>
@@ -252,7 +298,18 @@ export default function NotesPage() {
                      </>
                    )}
                  </span>
-                 <button className="text-xs font-medium px-3 py-1.5 rounded-md text-text hover:bg-border transition-colors border border-transparent">
+
+                 {!autoSaveEnabled && (
+                   <button 
+                     onClick={handleManualSave}
+                     disabled={!hasUnsavedChanges || saving}
+                     className="text-xs font-medium px-3 py-1.5 rounded-md bg-text text-bg hover:opacity-90 transition-opacity disabled:opacity-50"
+                   >
+                     Save
+                   </button>
+                 )}
+                 
+                 <button className="text-xs font-medium px-3 py-1.5 rounded-md text-text hover:bg-surface-hover transition-colors border border-transparent hidden sm:block">
                    Share
                  </button>
                </div>
@@ -269,15 +326,22 @@ export default function NotesPage() {
                     setActiveNote({ ...activeNote, title: e.target.value });
                     autoSave(activeNote.id, "title", e.target.value);
                   }}
-                  className="w-full text-3xl md:text-4xl font-bold bg-transparent outline-none text-text placeholder:text-muted/30 mb-6 md:mb-8 tracking-tight"
+                  className="w-full text-3xl md:text-4xl font-bold bg-transparent outline-none text-text placeholder:text-muted/30 mb-2 tracking-tight"
                   placeholder="Note Title"
                 />
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted/50 mb-6 md:mb-8 px-1">
+                  <span>Created: {new Date(activeNote.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+                  <span>Updated: {new Date(activeNote.updatedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+                </div>
                 
                 <div className="flex-1 flex flex-col cursor-text pb-8 mt-2">
                   <Editor
                     key={activeNote.id}
                     content={activeNote.content as object}
-                    onChange={(content) => autoSave(activeNote.id, "content", content)}
+                    onChange={(content) => {
+                      setActiveNote(prev => prev ? { ...prev, content } : null);
+                      autoSave(activeNote.id, "content", content);
+                    }}
                   />
                 </div>
               </div>

@@ -1,13 +1,15 @@
-export function useApi() {
-  function getToken(): string {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem("nexus_token") ?? "";
-  }
+import { useCallback } from "react";
 
-  async function apiFetch<T>(
+export function useApi() {
+  const apiFetch = useCallback(async <T,>(
     path: string,
     options: RequestInit = {}
-  ): Promise<T> {
+  ): Promise<T> => {
+    function getToken(): string {
+      if (typeof window === "undefined") return "";
+      return localStorage.getItem("nexus_token") ?? "";
+    }
+
     const res = await fetch(path, {
       ...options,
       headers: {
@@ -24,7 +26,7 @@ export function useApi() {
     }
 
     return res.json();
-  }
+  }, []);
 
   return { apiFetch };
 }
