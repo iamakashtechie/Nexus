@@ -1,6 +1,8 @@
 import type { Note, Notebook, Tag } from "@prisma/client";
 
 export type NoteWithTags = Note & {
+  fileType?: string;
+  markdownContent?: string | null;
   tags: Array<{ tag: Tag }>;
   notebook: Notebook | null;
 };
@@ -22,6 +24,8 @@ export type AuthPayload = {
 export type CreateNoteInput = {
   title: string;
   content: object;
+  fileType?: string;
+  markdownContent?: string;
   notebookId?: string;
   tags?: string[];
 };

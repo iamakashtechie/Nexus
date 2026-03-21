@@ -7,6 +7,8 @@ export const loginSchema = z.object({
 export const createNoteSchema = z.object({
   title: z.string().max(255),
   content: z.record(z.string(), z.unknown()),
+  fileType: z.string().regex(/^\.[a-z0-9][a-z0-9+\-]*$/i).optional(),
+  markdownContent: z.string().optional(),
   notebookId: z.string().cuid().optional(),
   tags: z.array(z.string().max(50)).optional(),
 });

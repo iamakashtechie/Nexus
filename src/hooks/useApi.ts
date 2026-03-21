@@ -25,7 +25,16 @@ export function useApi() {
       throw new Error("Unauthorized");
     }
 
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) {
+      const message =
+        data && typeof data === "object" && "error" in data
+          ? String((data as { error: unknown }).error)
+          : `Request failed: ${res.status}`;
+      throw new Error(message);
+    }
+
+    return data as T;
   }, []);
 
   return { apiFetch };

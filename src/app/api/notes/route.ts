@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createNoteSchema } from "@/lib/validations";
+import { normalizeFileType, normalizeNoteTitle, resolveNoteFileType } from "@/lib/fileType";
+
+function isLegacyPrismaClientError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes("Unknown arg `fileType`") ||
+    error.message.includes("Unknown argument `fileType`") ||
+    error.message.includes("Unknown arg `markdownContent`") ||
+    error.message.includes("Unknown argument `markdownContent`") ||
+    error.message.includes("column \"fileType\" does not exist") ||
+    error.message.includes("column \"markdownContent\" does not exist")
+  );
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,9 +40,16 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: notes });
-  } catch {
+  } catch (error) {
+    console.error("[GET /api/notes]", error);
     return NextResponse.json(
-      { success: false, error: "Failed to fetch notes" },
+      {
+        success: false,
+        error:
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.message
+            : "Failed to fetch notes",
+      },
       { status: 500 }
     );
   }
@@ -47,39 +67,83 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { title, content, notebookId, tags } = parsed.data;
+    const { title, content, fileType, markdownContent, notebookId, tags } = parsed.data;
+    const resolvedFileType = resolveNoteFileType({ title, fileType });
+    const normalizedTitle = normalizeNoteTitle(title, resolvedFileType);
     const normalizedContent = JSON.parse(JSON.stringify(content));
 
-    const note = await prisma.note.create({
-      data: {
-        title,
-        content: normalizedContent,
-        ...(notebookId ? { notebook: { connect: { id: notebookId } } } : {}),
-        ...(tags?.length
-          ? {
-              tags: {
-                create: tags.map((name) => ({
-                  tag: {
-                    connectOrCreate: {
-                      where: { name },
-                      create: { name },
+    let note;
+    try {
+      note = await (prisma as any).note.create({
+        data: {
+          title: normalizedTitle,
+          fileType: normalizeFileType(resolvedFileType),
+          content: normalizedContent,
+          markdownContent:
+            normalizeFileType(resolvedFileType) === ".md"
+              ? markdownContent ?? ""
+              : null,
+          ...(notebookId ? { notebook: { connect: { id: notebookId } } } : {}),
+          ...(tags?.length
+            ? {
+                tags: {
+                  create: tags.map((name) => ({
+                    tag: {
+                      connectOrCreate: {
+                        where: { name },
+                        create: { name },
+                      },
                     },
-                  },
-                })),
-              },
-            }
-          : {}),
-      },
-      include: {
-        tags: { include: { tag: true } },
-        notebook: true,
-      },
-    });
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: {
+          tags: { include: { tag: true } },
+          notebook: true,
+        },
+      });
+    } catch (error) {
+      if (!isLegacyPrismaClientError(error)) throw error;
+      note = await prisma.note.create({
+        data: {
+          title: normalizedTitle,
+          content: normalizedContent,
+          ...(notebookId ? { notebook: { connect: { id: notebookId } } } : {}),
+          ...(tags?.length
+            ? {
+                tags: {
+                  create: tags.map((name) => ({
+                    tag: {
+                      connectOrCreate: {
+                        where: { name },
+                        create: { name },
+                      },
+                    },
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: {
+          tags: { include: { tag: true } },
+          notebook: true,
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, data: note }, { status: 201 });
-  } catch {
+  } catch (error) {
+    console.error("[POST /api/notes]", error);
     return NextResponse.json(
-      { success: false, error: "Failed to create note" },
+      {
+        success: false,
+        error:
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.message
+            : "Failed to create note",
+      },
       { status: 500 }
     );
   }

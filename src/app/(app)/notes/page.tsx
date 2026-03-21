@@ -7,7 +7,38 @@ import type { NoteWithTags } from "@/types";
 import type { Notebook } from "@prisma/client";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 import { ContextMenu, type MenuItem } from "@/components/ui/ContextMenu";
+import {
+  normalizeFileType,
+  normalizeNoteTitle,
+  resolveNoteFileType,
+} from "@/lib/fileType";
 import dynamic from "next/dynamic";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
+
+function extractTextFromRichContent(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+
+  const data = node as { type?: string; text?: string; content?: unknown[] };
+  const children = Array.isArray(data.content) ? data.content : [];
+
+  if (data.type === "text") return data.text ?? "";
+
+  const childText = children.map(extractTextFromRichContent).join("");
+
+  if (["paragraph", "heading", "codeBlock", "blockquote", "listItem"].includes(data.type ?? "")) {
+    return `${childText}\n`;
+  }
+
+  return childText;
+}
+
+function getMarkdownValue(note: NoteWithTags | null): string {
+  if (!note) return "";
+  if (note.markdownContent && note.markdownContent.trim().length > 0) return note.markdownContent;
+  return extractTextFromRichContent(note.content).trim();
+}
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
@@ -39,9 +70,23 @@ export default function NotesPage() {
   const [newFolderName, setNewFolderName] = useState("");
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [renameFolderName, setRenameFolderName] = useState("");
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string; tone: "info" | "success" | "error" }>>([]);
 
   // Context menu
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: MenuItem[]; placement?: "right" | "left" } | null>(null);
+
+  const isMarkdownNote = activeNote
+    ? resolveNoteFileType({ title: activeNote.title, fileType: activeNote.fileType }) === ".md"
+    : false;
+  const markdownValue = getMarkdownValue(activeNote);
+
+  function showToast(message: string, tone: "info" | "success" | "error" = "info") {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setToasts((prev) => [...prev, { id, message, tone }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 3200);
+  }
 
   const fetchNotebooks = useCallback(async () => {
     const res = await apiFetch<{ success: boolean; data: NotebookWithCount[] }>("/api/notebooks");
@@ -72,7 +117,9 @@ export default function NotesPage() {
       {
         method: "POST",
         body: JSON.stringify({
-          title: "",
+          title: "Untitled.md",
+          fileType: ".md",
+          markdownContent: "",
           content: { type: "doc", content: [{ type: "paragraph" }] },
         }),
       }
@@ -96,7 +143,7 @@ export default function NotesPage() {
   }, [apiFetch, fetchNotes, search]);
 
   const autoSave = useCallback(
-    (noteId: string, field: "title" | "content", value: unknown) => {
+    (noteId: string, field: "title" | "content" | "markdownContent" | "fileType", value: unknown) => {
       setHasUnsavedChanges(true); // Always mark as unsaved on any edit
       if (!autoSaveEnabled) return;
 
@@ -112,7 +159,18 @@ export default function NotesPage() {
 
   const handleManualSave = async () => {
     if (!activeNote || !hasUnsavedChanges) return;
-    await triggerApiSave(activeNote.id, { title: activeNote.title, content: activeNote.content });
+    const resolvedFileType = resolveNoteFileType({
+      title: activeNote.title,
+      fileType: activeNote.fileType,
+    });
+
+    await triggerApiSave(activeNote.id, {
+      title: activeNote.title,
+      fileType: resolvedFileType,
+      ...(resolvedFileType === ".md"
+        ? { markdownContent: activeNote.markdownContent ?? "" }
+        : { content: activeNote.content }),
+    });
   };
 
   async function deleteNote(id: string) {
@@ -172,10 +230,85 @@ export default function NotesPage() {
     void fetchNotebooks();
   }
 
+  function getAuthToken(): string {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("nexus_token") ?? "";
+  }
+
+  function saveBlob(blob: Blob, fileName: string) {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function downloadNoteFile(note: NoteWithTags) {
+    showToast("Preparing note download. It will start shortly.", "info");
+
+    const res = await fetch(`/api/notes/${note.id}/download`, {
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (res.status === 401) {
+      localStorage.removeItem("nexus_token");
+      window.location.href = "/login";
+      return;
+    }
+
+    if (!res.ok) {
+      showToast("Failed to download file.", "error");
+      return;
+    }
+
+    const blob = await res.blob();
+    const fileName =
+      res.headers
+        .get("content-disposition")
+        ?.match(/filename=\"?([^\";]+)\"?/)?.[1] ?? note.title;
+    saveBlob(blob, fileName);
+    showToast("Note downloaded.", "success");
+  }
+
+  async function downloadNotebookZip(nb: NotebookWithCount) {
+    showToast("Preparing folder backup. Download will start shortly.", "info");
+
+    const res = await fetch(`/api/notebooks/${nb.id}/download`, {
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (res.status === 401) {
+      localStorage.removeItem("nexus_token");
+      window.location.href = "/login";
+      return;
+    }
+
+    if (!res.ok) {
+      showToast("Failed to download folder.", "error");
+      return;
+    }
+
+    const blob = await res.blob();
+    const fileName =
+      res.headers
+        .get("content-disposition")
+        ?.match(/filename=\"?([^\";]+)\"?/)?.[1] ?? `${nb.name}.zip`;
+    saveBlob(blob, fileName);
+    showToast("Folder backup downloaded.", "success");
+  }
+
   // Note context menu builder
   function buildNoteContextMenu(note: NoteWithTags): MenuItem[] {
     return [
       { label: note.pinned ? "Unpin" : "Pin", onClick: () => togglePin(note) },
+      { label: "Download File", onClick: () => void downloadNoteFile(note) },
       {
         label: "Move to Folder",
         onClick: () => {},
@@ -192,6 +325,7 @@ export default function NotesPage() {
   // Folder context menu builder
   function buildFolderContextMenu(nb: NotebookWithCount): MenuItem[] {
     return [
+      { label: "Download Folder (.zip)", onClick: () => void downloadNotebookZip(nb) },
       { label: "Rename", onClick: () => { setRenamingFolderId(nb.id); setRenameFolderName(nb.name); } },
       { label: "Delete Folder", onClick: () => deleteNotebook(nb.id), danger: true, divider: true },
     ];
@@ -368,7 +502,7 @@ export default function NotesPage() {
             >
               <div className="flex-1 min-w-0 py-0.5">
                 <p className={`text-[13px] truncate ${activeNote?.id === note.id ? "font-medium text-text" : "font-normal"}`}>
-                  {note.title || "Untitled"}
+                  {normalizeNoteTitle(note.title)}
                 </p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <p className="text-[11px] text-muted/70">
@@ -421,6 +555,24 @@ export default function NotesPage() {
         <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} placement={ctxMenu.placement} onClose={() => setCtxMenu(null)} />
       )}
 
+      {/* Download toasts */}
+      <div className="pointer-events-none fixed bottom-4 right-4 z-[1200] flex w-[min(92vw,340px)] flex-col gap-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur-sm transition-all ${
+              toast.tone === "success"
+                ? "border-green-500/40 bg-green-500/12 text-green-300"
+                : toast.tone === "error"
+                  ? "border-red-500/40 bg-red-500/12 text-red-300"
+                  : "border-border bg-surface/95 text-text"
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
+
       {/* Editor area */}
       <main className={`flex-1 flex-col overflow-hidden bg-bg relative w-full ${!activeNote ? 'hidden md:flex' : 'flex'}`}>
         {activeNote ? (
@@ -438,7 +590,7 @@ export default function NotesPage() {
                  </button>
                  <span className="hidden md:inline">{activeNote.notebook?.name || "All Notes"}</span>
                  <span className="hidden md:inline text-border">/</span>
-                 <span className="text-text font-medium truncate max-w-[120px] md:max-w-xs">{activeNote.title || "Untitled"}</span>
+                 <span className="text-text font-medium truncate max-w-[120px] md:max-w-xs">{normalizeNoteTitle(activeNote.title)}</span>
                </div>
                
                <div className="flex items-center gap-3">
@@ -507,8 +659,32 @@ export default function NotesPage() {
                     setActiveNote({ ...activeNote, title: e.target.value });
                     autoSave(activeNote.id, "title", e.target.value);
                   }}
+                  onBlur={() => {
+                    const resolvedFileType = resolveNoteFileType({
+                      title: activeNote.title,
+                      fileType: activeNote.fileType,
+                    });
+                    const normalizedTitle = normalizeNoteTitle(activeNote.title, resolvedFileType);
+                    const titleChanged = normalizedTitle !== activeNote.title;
+                    const fileTypeChanged = normalizeFileType(activeNote.fileType) !== resolvedFileType;
+
+                    if (titleChanged || fileTypeChanged) {
+                      setActiveNote({
+                        ...activeNote,
+                        title: normalizedTitle,
+                        fileType: resolvedFileType,
+                      });
+
+                      if (titleChanged) {
+                        autoSave(activeNote.id, "title", normalizedTitle);
+                      }
+                      if (fileTypeChanged) {
+                        autoSave(activeNote.id, "fileType", resolvedFileType);
+                      }
+                    }
+                  }}
                   className={`w-full text-3xl md:text-4xl font-bold bg-transparent outline-none text-text placeholder:text-muted/30 mb-2 tracking-tight ${!isEditing ? 'cursor-default' : ''}`}
-                  placeholder="Note Title"
+                  placeholder="Untitled.md"
                 />
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted/50 mb-6 md:mb-8 px-1">
                   <span>Created: {new Date(activeNote.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
@@ -516,15 +692,38 @@ export default function NotesPage() {
                 </div>
                 
                 <div className={`flex-1 flex flex-col pb-8 mt-2 ${isEditing ? 'cursor-text' : 'cursor-default'}`}>
-                  <Editor
-                    key={activeNote.id}
-                    content={activeNote.content as object}
-                    editable={isEditing}
-                    onChange={(content) => {
-                      setActiveNote(prev => prev ? { ...prev, content } : null);
-                      autoSave(activeNote.id, "content", content);
-                    }}
-                  />
+                  {isMarkdownNote ? (
+                    isEditing ? (
+                      <textarea
+                        value={markdownValue}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setActiveNote((prev) => (prev ? { ...prev, markdownContent: next } : null));
+                          autoSave(activeNote.id, "markdownContent", next);
+                        }}
+                        className="flex-1 min-h-[500px] w-full rounded-xl border border-border/40 bg-surface/30 p-4 text-sm leading-6 text-text outline-none transition-all hover:border-border/60 focus:border-border"
+                        spellCheck={false}
+                      />
+                    ) : (
+                      <div className="min-h-[500px] rounded-xl border border-border/40 bg-surface/30 px-5 py-4">
+                        <article className="prose prose-sm max-w-none prose-invert prose-headings:text-text prose-p:text-text/90 prose-strong:text-text prose-a:text-accent prose-code:text-text prose-pre:bg-surface-hover">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                            {markdownValue}
+                          </ReactMarkdown>
+                        </article>
+                      </div>
+                    )
+                  ) : (
+                    <Editor
+                      key={activeNote.id}
+                      content={activeNote.content as object}
+                      editable={isEditing}
+                      onChange={(content) => {
+                        setActiveNote(prev => prev ? { ...prev, content } : null);
+                        autoSave(activeNote.id, "content", content);
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             </div>

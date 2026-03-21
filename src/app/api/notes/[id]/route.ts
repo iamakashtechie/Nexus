@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { updateNoteSchema } from "@/lib/validations";
+import {
+  normalizeFileType,
+  normalizeNoteTitle,
+  replaceTitleExtension,
+  resolveNoteFileType,
+} from "@/lib/fileType";
+
+function isLegacyPrismaClientError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes("Unknown arg `fileType`") ||
+    error.message.includes("Unknown argument `fileType`") ||
+    error.message.includes("Unknown arg `markdownContent`") ||
+    error.message.includes("Unknown argument `markdownContent`") ||
+    error.message.includes("column \"fileType\" does not exist") ||
+    error.message.includes("column \"markdownContent\" does not exist")
+  );
+}
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -23,9 +41,16 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json({ success: true, data: note });
-  } catch {
+  } catch (error) {
+    console.error("[GET /api/notes/:id]", error);
     return NextResponse.json(
-      { success: false, error: "Failed to fetch note" },
+      {
+        success: false,
+        error:
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.message
+            : "Failed to fetch note",
+      },
       { status: 500 }
     );
   }
@@ -44,47 +69,101 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       );
     }
 
-    const { title, content, notebookId, pinned, tags } = parsed.data;
+    const existing = await prisma.note.findUnique({
+      where: { id },
+      select: { title: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Note not found" },
+        { status: 404 }
+      );
+    }
+
+    const { title, content, fileType, markdownContent, notebookId, pinned, tags } = parsed.data;
+    const fileTypeFromPayload = fileType !== undefined ? normalizeFileType(fileType) : undefined;
+    const existingFileType = resolveNoteFileType({ title: existing.title, fileType: ".md" });
+
+    let resolvedFileType = fileTypeFromPayload ?? existingFileType;
+    if (title !== undefined) {
+      resolvedFileType = resolveNoteFileType({ title, fileType: resolvedFileType });
+    }
+
+    const normalizedTitle =
+      title !== undefined
+        ? normalizeNoteTitle(title, resolvedFileType)
+        : fileTypeFromPayload !== undefined
+          ? replaceTitleExtension(existing.title, resolvedFileType)
+          : undefined;
     const normalizedContent =
       content !== undefined ? JSON.parse(JSON.stringify(content)) : undefined;
 
-    const note = await prisma.note.update({
-      where: { id },
-      data: {
-        ...(title !== undefined ? { title } : {}),
-        ...(normalizedContent !== undefined ? { content: normalizedContent } : {}),
-        ...(notebookId !== undefined
-          ? notebookId
-            ? { notebook: { connect: { id: notebookId } } }
-            : { notebook: { disconnect: true } }
-          : {}),
-        ...(pinned !== undefined ? { pinned } : {}),
-        ...(tags !== undefined
-          ? {
-              tags: {
-                deleteMany: {},
-                create: tags.map((name) => ({
-                  tag: {
-                    connectOrCreate: {
-                      where: { name },
-                      create: { name },
-                    },
+    const commonData = {
+      ...(normalizedTitle !== undefined ? { title: normalizedTitle } : {}),
+      ...(normalizedContent !== undefined ? { content: normalizedContent } : {}),
+      ...(notebookId !== undefined
+        ? notebookId
+          ? { notebook: { connect: { id: notebookId } } }
+          : { notebook: { disconnect: true } }
+        : {}),
+      ...(pinned !== undefined ? { pinned } : {}),
+      ...(tags !== undefined
+        ? {
+            tags: {
+              deleteMany: {},
+              create: tags.map((name) => ({
+                tag: {
+                  connectOrCreate: {
+                    where: { name },
+                    create: { name },
                   },
-                })),
-              },
-            }
-          : {}),
-      },
-      include: {
-        tags: { include: { tag: true } },
-        notebook: true,
-      },
-    });
+                },
+              })),
+            },
+          }
+        : {}),
+    };
+
+    let note;
+    try {
+      note = await (prisma as any).note.update({
+        where: { id },
+        data: {
+          ...commonData,
+          fileType: resolvedFileType,
+          ...(resolvedFileType === ".md"
+            ? { markdownContent: markdownContent ?? undefined }
+            : { markdownContent: null }),
+        },
+        include: {
+          tags: { include: { tag: true } },
+          notebook: true,
+        },
+      });
+    } catch (error) {
+      if (!isLegacyPrismaClientError(error)) throw error;
+      note = await prisma.note.update({
+        where: { id },
+        data: commonData,
+        include: {
+          tags: { include: { tag: true } },
+          notebook: true,
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, data: note });
-  } catch {
+  } catch (error) {
+    console.error("[PATCH /api/notes/:id]", error);
     return NextResponse.json(
-      { success: false, error: "Failed to update note" },
+      {
+        success: false,
+        error:
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.message
+            : "Failed to update note",
+      },
       { status: 500 }
     );
   }
@@ -95,9 +174,16 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     await prisma.note.delete({ where: { id } });
     return NextResponse.json({ success: true, data: null });
-  } catch {
+  } catch (error) {
+    console.error("[DELETE /api/notes/:id]", error);
     return NextResponse.json(
-      { success: false, error: "Failed to delete note" },
+      {
+        success: false,
+        error:
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.message
+            : "Failed to delete note",
+      },
       { status: 500 }
     );
   }
