@@ -9,7 +9,7 @@ import ts from "highlight.js/lib/languages/typescript";
 import python from "highlight.js/lib/languages/python";
 import bash from "highlight.js/lib/languages/bash";
 import css from "highlight.js/lib/languages/css";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 
 const lowlight = createLowlight();
 lowlight.register({ js, ts, python, bash, css });
@@ -21,6 +21,9 @@ type EditorProps = {
 };
 
 export default function Editor({ content, onChange, editable = true }: EditorProps) {
+  const initialContentStr = useRef("");
+  const isInitialized = useRef(false);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -29,8 +32,15 @@ export default function Editor({ content, onChange, editable = true }: EditorPro
     ],
     content,
     editable,
+    onCreate({ editor }) {
+      initialContentStr.current = JSON.stringify(editor.getJSON());
+      isInitialized.current = true;
+    },
     onUpdate({ editor }) {
-      onChange(editor.getJSON());
+      if (!isInitialized.current) return;
+      const currentJson = editor.getJSON();
+      if (JSON.stringify(currentJson) === initialContentStr.current) return;
+      onChange(currentJson);
     },
   });
 

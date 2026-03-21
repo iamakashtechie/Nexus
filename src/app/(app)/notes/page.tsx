@@ -22,6 +22,7 @@ export default function NotesPage() {
   const [notes, setNotes] = useState<NoteWithTags[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [activeNote, setActiveNote] = useState<NoteWithTags | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
@@ -59,6 +60,7 @@ export default function NotesPage() {
     if (res.success) {
       setNotes((prev) => [res.data, ...prev]);
       setActiveNote(res.data);
+      setIsEditing(true);
     }
   }
 
@@ -194,7 +196,10 @@ export default function NotesPage() {
           {filtered.map((note) => (
             <div
               key={note.id}
-              onClick={() => setActiveNote(note)}
+              onClick={() => {
+                setActiveNote(note);
+                setIsEditing(false);
+              }}
               className={`group relative flex items-start gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-all mb-0.5 ${
                 activeNote?.id === note.id
                   ? "bg-surface-hover/80 text-text"
@@ -309,7 +314,8 @@ export default function NotesPage() {
                    </button>
                  )}
                  
-                 <button className="text-xs font-medium px-3 py-1.5 rounded-md text-text hover:bg-surface-hover transition-colors border border-transparent hidden sm:block">
+                 <button onClick={() => setIsEditing(!isEditing)} className={`text-xs font-medium px-3 py-1.5 rounded-md hover:bg-surface-hover transition-colors border ${isEditing ? 'border-border/50 text-text' : 'border-transparent text-muted'}`}>{isEditing ? "View Mode" : "Edit Mode"}</button>
+                  <button className="text-xs font-medium px-3 py-1.5 rounded-md text-text hover:bg-surface-hover transition-colors border border-transparent hidden sm:block">
                    Share
                  </button>
                </div>
@@ -322,11 +328,12 @@ export default function NotesPage() {
                   data-testid="note-title"
                   type="text"
                   value={activeNote.title}
+                  readOnly={!isEditing}
                   onChange={(e) => {
                     setActiveNote({ ...activeNote, title: e.target.value });
                     autoSave(activeNote.id, "title", e.target.value);
                   }}
-                  className="w-full text-3xl md:text-4xl font-bold bg-transparent outline-none text-text placeholder:text-muted/30 mb-2 tracking-tight"
+                  className={`w-full text-3xl md:text-4xl font-bold bg-transparent outline-none text-text placeholder:text-muted/30 mb-2 tracking-tight ${!isEditing ? 'cursor-default' : ''}`}
                   placeholder="Note Title"
                 />
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted/50 mb-6 md:mb-8 px-1">
@@ -334,10 +341,11 @@ export default function NotesPage() {
                   <span>Updated: {new Date(activeNote.updatedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
                 </div>
                 
-                <div className="flex-1 flex flex-col cursor-text pb-8 mt-2">
+                <div className={`flex-1 flex flex-col pb-8 mt-2 ${isEditing ? 'cursor-text' : 'cursor-default'}`}>
                   <Editor
                     key={activeNote.id}
                     content={activeNote.content as object}
+                    editable={isEditing}
                     onChange={(content) => {
                       setActiveNote(prev => prev ? { ...prev, content } : null);
                       autoSave(activeNote.id, "content", content);
