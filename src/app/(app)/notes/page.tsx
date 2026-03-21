@@ -41,7 +41,7 @@ export default function NotesPage() {
   const [renameFolderName, setRenameFolderName] = useState("");
 
   // Context menu
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: MenuItem[]; placement?: "right" | "left" } | null>(null);
 
   const fetchNotebooks = useCallback(async () => {
     const res = await apiFetch<{ success: boolean; data: NotebookWithCount[] }>("/api/notebooks");
@@ -386,7 +386,7 @@ export default function NotesPage() {
                 onClick={(e) => {
                   e.stopPropagation();
                   const rect = (e.target as HTMLElement).getBoundingClientRect();
-                  setCtxMenu({ x: rect.left, y: rect.bottom, items: buildNoteContextMenu(note) });
+                  setCtxMenu({ x: rect.left, y: rect.bottom, items: buildNoteContextMenu(note), placement: "left" });
                 }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
@@ -403,7 +403,7 @@ export default function NotesPage() {
                   onClick={(e) => {
                     e.stopPropagation();
                     const rect = (e.target as HTMLElement).getBoundingClientRect();
-                    setCtxMenu({ x: rect.left, y: rect.bottom, items: buildNoteContextMenu(note) });
+                    setCtxMenu({ x: rect.left, y: rect.bottom, items: buildNoteContextMenu(note), placement: "left" });
                   }}
                   className="text-muted hover:text-text p-1 rounded-md transition-colors"
                   title="More"
@@ -418,7 +418,7 @@ export default function NotesPage() {
 
       {/* Context Menu Portal */}
       {ctxMenu && (
-        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} placement={ctxMenu.placement} onClose={() => setCtxMenu(null)} />
       )}
 
       {/* Editor area */}

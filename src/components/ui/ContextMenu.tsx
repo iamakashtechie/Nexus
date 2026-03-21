@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useCallback, useState } from "react";
 
 export type MenuItem = {
   label: string;
@@ -16,10 +16,12 @@ type ContextMenuProps = {
   y: number;
   items: MenuItem[];
   onClose: () => void;
+  placement?: "right" | "left";
 };
 
-export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
+export function ContextMenu({ x, y, items, onClose, placement = "right" }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ left: x, top: y });
 
   const handleClickOutside = useCallback(
     (e: MouseEvent) => {
@@ -42,11 +44,31 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     };
   }, [handleClickOutside, onClose]);
 
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+
+    const margin = 8;
+    const gap = 8;
+    const menuWidth = ref.current.offsetWidth;
+    const menuHeight = ref.current.offsetHeight;
+
+    let left = placement === "left" ? x - menuWidth - gap : x;
+    let top = y;
+
+    const maxLeft = Math.max(margin, window.innerWidth - menuWidth - margin);
+    const maxTop = Math.max(margin, window.innerHeight - menuHeight - margin);
+
+    left = Math.min(Math.max(left, margin), maxLeft);
+    top = Math.min(Math.max(top, margin), maxTop);
+
+    setPosition({ left, top });
+  }, [x, y, items, placement]);
+
   // Adjust position to keep menu inside viewport
   const style: React.CSSProperties = {
     position: "fixed",
-    top: y,
-    left: x,
+    top: position.top,
+    left: position.left,
     zIndex: 1000,
   };
 
