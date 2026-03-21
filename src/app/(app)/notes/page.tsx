@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/useApi";
 import type { NoteWithTags } from "@/types";
+import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 import dynamic from "next/dynamic";
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
@@ -110,48 +111,47 @@ export default function NotesPage() {
     <div className="flex h-screen overflow-hidden bg-bg text-text selection:bg-accent/20 selection:text-text">
 
       {/* Sidebar */}
-      <aside className="flex flex-col w-72 shrink-0 border-r border-border bg-surface">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4">
+      <aside className={`flex-col w-full md:w-72 shrink-0 border-r border-border bg-surface ${activeNote ? 'hidden md:flex' : 'flex'}`}>
+        {/* Header content minimalized */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-accent text-white flex items-center justify-center font-bold text-[10px] tracking-tighter">N</div>
+            <div className="w-5 h-5 rounded-[4px] bg-text text-bg flex items-center justify-center font-bold text-[10px] tracking-tighter">N</div>
             <span className="font-semibold text-sm tracking-tight text-text">Nexus</span>
           </div>
-          <button
-            onClick={logout}
-            className="text-xs px-2 py-1 rounded-md text-muted hover:text-text hover:bg-surface-hover transition-colors"
-            title="Logout"
-          >
-            Logout
-          </button>
-        </div>
-
-        {/* Action Bar */}
-        <div className="px-3 pb-3">
-          <button
-            data-testid="new-note-btn"
-            onClick={createNote}
-            className="w-full py-2 px-3 rounded-lg text-sm font-medium transition-all bg-accent hover:bg-accent-hover text-white shadow-sm flex items-center justify-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-            New Note
-          </button>
+          <div className="flex items-center gap-1">
+            <ThemeSwitcher />
+            <button
+              data-testid="new-note-btn"
+              onClick={createNote}
+              className="p-1.5 rounded-md text-muted hover:text-text hover:bg-surface-hover transition-colors"
+              title="New Note"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
+            <button
+              onClick={logout}
+              className="p-1.5 rounded-md text-muted hover:text-text hover:bg-surface-hover transition-colors"
+              title="Logout"
+            >
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+            </button>
+          </div>
         </div>
 
         {/* Search */}
-        <div className="px-3 pb-2">
-          <div className="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <div className="px-3 py-2">
+          <div className="group relative flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 text-muted/70 group-focus-within:text-accent transition-colors"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             <input
               data-testid="search-input"
               type="text"
-              placeholder="Search..."
+              placeholder="Search notes..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 fetchNotes(e.target.value);
               }}
-              className="w-full pl-9 pr-3 py-1.5 rounded-lg text-sm outline-none bg-bg border border-border text-text focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all placeholder:text-muted/70"
+              className="w-full pl-9 pr-3 py-1.5 rounded-md text-sm outline-none bg-surface-hover/50 hover:bg-surface-hover focus:bg-surface border border-transparent focus:border-border text-text transition-all placeholder:text-muted/50"
             />
           </div>
         </div>
@@ -171,24 +171,24 @@ export default function NotesPage() {
             <div
               key={note.id}
               onClick={() => setActiveNote(note)}
-              className={`group relative flex items-start gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-all mb-0.5 ${
+              className={`group relative flex items-start gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-all mb-0.5 ${
                 activeNote?.id === note.id
-                  ? "bg-accent/10 text-accent font-medium"
-                  : "hover:bg-surface-hover text-text"
+                  ? "bg-surface-hover/80 text-text"
+                  : "hover:bg-surface-hover/50 text-text/80"
               }`}
             >
-              {note.pinned && (
-                <span className={`mt-1 text-[10px] shrink-0 ${activeNote?.id === note.id ? "text-accent" : "text-accent/60"}`}>
-                  ●
-                </span>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm truncate ${activeNote?.id === note.id ? "font-medium" : "font-normal"}`}>
+              <div className="flex-1 min-w-0 py-0.5">
+                <p className={`text-[13px] truncate ${activeNote?.id === note.id ? "font-medium text-text" : "font-normal"}`}>
                   {note.title || "Untitled"}
                 </p>
-                <p className={`text-[11px] mt-0.5 truncate ${activeNote?.id === note.id ? "text-accent/70" : "text-muted"}`}>
-                  {new Date(note.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-[11px] text-muted/70">
+                    {new Date(note.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </p>
+                  {note.pinned && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-text/30"></span>
+                  )}
+                </div>
               </div>
 
               {/* Actions */}
@@ -219,16 +219,23 @@ export default function NotesPage() {
       </aside>
 
       {/* Editor area */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-bg relative">
+      <main className={`flex-1 flex-col overflow-hidden bg-bg relative w-full ${!activeNote ? 'hidden md:flex' : 'flex'}`}>
         {activeNote ? (
           <>
             {/* Note header / top bar */}
-            <header className="flex items-center justify-between px-8 py-5 shrink-0">
+            <header className="flex items-center justify-between px-4 md:px-8 py-3 md:py-5 shrink-0 border-b border-transparent md:border-none">
                {/* Breadcrumbs or Status indicator can go here */}
                <div className="flex items-center gap-2 text-xs text-muted">
-                 <span>Personal</span>
-                 <span className="text-border">/</span>
-                 <span className="text-text font-medium">{activeNote.title || "Untitled"}</span>
+                 <button 
+                   onClick={() => setActiveNote(null)}
+                   className="md:hidden flex items-center gap-1 text-muted hover:text-text px-1 py-1 rounded-md transition-colors"
+                 >
+                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                   Back
+                 </button>
+                 <span className="hidden md:inline">Personal</span>
+                 <span className="hidden md:inline text-border">/</span>
+                 <span className="text-text font-medium truncate max-w-[120px] md:max-w-xs">{activeNote.title || "Untitled"}</span>
                </div>
                
                <div className="flex items-center gap-3">
@@ -253,7 +260,7 @@ export default function NotesPage() {
 
             {/* Note Title & Editor */}
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-3xl mx-auto px-8 py-4">
+              <div className="max-w-3xl mx-auto px-5 md:px-8 py-4 md:py-8">
                 <input
                   data-testid="note-title"
                   type="text"
@@ -262,7 +269,7 @@ export default function NotesPage() {
                     setActiveNote({ ...activeNote, title: e.target.value });
                     autoSave(activeNote.id, "title", e.target.value);
                   }}
-                  className="w-full text-4xl font-bold bg-transparent outline-none text-text placeholder:text-muted/40 mb-8 tracking-tight"
+                  className="w-full text-3xl md:text-4xl font-bold bg-transparent outline-none text-text placeholder:text-muted/30 mb-6 md:mb-8 tracking-tight"
                   placeholder="Note Title"
                 />
                 
@@ -274,20 +281,20 @@ export default function NotesPage() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted max-w-sm mx-auto text-center">
-            <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center shadow-sm">
-               <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-accent/60"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted max-w-xs mx-auto text-center px-4">
+            <div className="w-12 h-12 rounded-xl bg-surface-hover/30 flex items-center justify-center mb-2">
+               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted/80"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-text mb-1 tracking-tight">Select a note to start</h2>
-              <p className="text-sm text-muted mb-6">Choose a note from the sidebar or create a new one to capture your thoughts.</p>
+              <h2 className="text-[15px] font-medium text-text mb-1 tracking-tight">Select a note</h2>
+              <p className="text-[13px] text-muted mb-6">Choose a note from the sidebar or create a new one.</p>
             </div>
             <button
               onClick={createNote}
-              className="px-5 py-2.5 rounded-lg transition-all bg-accent hover:bg-accent-hover text-white shadow-sm font-medium flex items-center gap-2 text-sm"
+              className="px-4 py-2 rounded-md transition-all hover:bg-surface-hover text-text font-medium flex items-center gap-2 text-[13px]"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-              Create New Note
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              Create Note
             </button>
           </div>
         )}
