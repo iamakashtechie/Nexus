@@ -129,20 +129,47 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         : {}),
     };
 
-    const note = await (prisma as any).note.update({
-      where: { id },
-      data: {
-        ...commonData,
-        fileType: resolvedFileType,
-        ...(resolvedFileType === ".md"
-          ? { markdownContent: markdownContent ?? undefined }
-          : { markdownContent: null }),
-      },
-      include: {
-        tags: { include: { tag: true } },
-        notebook: true,
-      },
-    });
+    let note;
+    try {
+      note = await (prisma as any).note.update({
+        where: { id },
+        data: {
+          ...commonData,
+          fileType: resolvedFileType,
+          ...(resolvedFileType === ".md"
+            ? { markdownContent: markdownContent ?? undefined }
+            : { markdownContent: null }),
+        },
+        include: { tags: { include: { tag: true } }, notebook: true },
+      });
+    } catch (e: any) {
+      const msg = e.message || "";
+      if (msg.includes("column \"fileType\"") || msg.includes("column \"markdownContent\"")) {
+        console.log('[NEXUS_DEBUG_SERVER] Auto-patching Neon DB columns...');
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Note" ADD COLUMN IF NOT EXISTS "fileType" TEXT NOT NULL DEFAULT '.md';`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Note" ADD COLUMN IF NOT EXISTS "markdownContent" TEXT;`);
+        note = await (prisma as any).note.update({
+          where: { id },
+          data: {
+            ...commonData,
+            fileType: resolvedFileType,
+            ...(resolvedFileType === ".md"
+              ? { markdownContent: markdownContent ?? undefined }
+              : { markdownContent: null }),
+          },
+          include: { tags: { include: { tag: true } }, notebook: true },
+        });
+      } else if (msg.includes("Unknown arg `fileType`") || msg.includes("Unknown argument `fileType`")) {
+        console.log('[NEXUS_DEBUG_SERVER] Outdated Prisma Client in Vercel. Falling back.');
+        note = await prisma.note.update({
+          where: { id },
+          data: commonData,
+          include: { tags: { include: { tag: true } }, notebook: true },
+        });
+      } else {
+        throw e;
+      }
+    }
 
     console.log('[NEXUS_DEBUG_SERVER] PATCH success', {
       id,
@@ -156,10 +183,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     return NextResponse.json(
       {
         success: false,
-        error:
-          process.env.NODE_ENV === "development" && error instanceof Error
-            ? error.message
-            : "Failed to update note",
+        error: error instanceof Error ? error.message : "Failed to update note",
       },
       { status: 500 }
     );
