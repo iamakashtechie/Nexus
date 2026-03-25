@@ -49,6 +49,15 @@ export default function Editor({ content, onChange, editable = true }: EditorPro
     editor.setEditable(editable);
   }, [editor, editable]);
 
+  // Sync content when prop changes (note switch / new note creation)
+  useEffect(() => {
+    if (!editor || !isInitialized.current) return;
+    const incomingStr = JSON.stringify(content);
+    if (incomingStr === initialContentStr.current) return;
+    initialContentStr.current = incomingStr;
+    editor.commands.setContent(content);
+  }, [editor, content]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Tab") {
