@@ -8,6 +8,9 @@ import {
   resolveNoteFileType,
 } from "@/lib/fileType";
 
+// Prevent Next.js from caching GET responses in production
+export const dynamic = "force-dynamic";
+
 function isLegacyPrismaClientError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return (

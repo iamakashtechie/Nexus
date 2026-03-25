@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { createNoteSchema } from "@/lib/validations";
 import { normalizeFileType, normalizeNoteTitle, resolveNoteFileType } from "@/lib/fileType";
 
+// Prevent Next.js from caching GET responses in production
+export const dynamic = "force-dynamic";
+
 function isLegacyPrismaClientError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return (

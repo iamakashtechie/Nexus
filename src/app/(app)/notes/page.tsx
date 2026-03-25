@@ -134,12 +134,16 @@ export default function NotesPage() {
 
   const triggerApiSave = useCallback(async (noteId: string, payload: any) => {
     setSaving(true);
-    await apiFetch(`/api/notes/${noteId}`, {
+    const res = await apiFetch<{ success: boolean; data: NoteWithTags }>(`/api/notes/${noteId}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
     setSaving(false);
     setHasUnsavedChanges(false);
+    // Sync activeNote with server-returned data to prevent stale content on re-click
+    if (res.success) {
+      setActiveNote(prev => prev?.id === noteId ? { ...prev, ...res.data } : prev);
+    }
     void fetchNotes(search);
   }, [apiFetch, fetchNotes, search]);
 
