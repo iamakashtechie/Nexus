@@ -11,17 +11,6 @@ import {
 // Prevent Next.js from caching GET responses in production
 export const dynamic = "force-dynamic";
 
-function isLegacyPrismaClientError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  return (
-    error.message.includes("Unknown arg `fileType`") ||
-    error.message.includes("Unknown argument `fileType`") ||
-    error.message.includes("Unknown arg `markdownContent`") ||
-    error.message.includes("Unknown argument `markdownContent`") ||
-    error.message.includes("column \"fileType\" does not exist") ||
-    error.message.includes("column \"markdownContent\" does not exist")
-  );
-}
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -140,33 +129,20 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         : {}),
     };
 
-    let note;
-    try {
-      note = await (prisma as any).note.update({
-        where: { id },
-        data: {
-          ...commonData,
-          fileType: resolvedFileType,
-          ...(resolvedFileType === ".md"
-            ? { markdownContent: markdownContent ?? undefined }
-            : { markdownContent: null }),
-        },
-        include: {
-          tags: { include: { tag: true } },
-          notebook: true,
-        },
-      });
-    } catch (error) {
-      if (!isLegacyPrismaClientError(error)) throw error;
-      note = await prisma.note.update({
-        where: { id },
-        data: commonData,
-        include: {
-          tags: { include: { tag: true } },
-          notebook: true,
-        },
-      });
-    }
+    const note = await (prisma as any).note.update({
+      where: { id },
+      data: {
+        ...commonData,
+        fileType: resolvedFileType,
+        ...(resolvedFileType === ".md"
+          ? { markdownContent: markdownContent ?? undefined }
+          : { markdownContent: null }),
+      },
+      include: {
+        tags: { include: { tag: true } },
+        notebook: true,
+      },
+    });
 
     console.log('[NEXUS_DEBUG_SERVER] PATCH success', {
       id,

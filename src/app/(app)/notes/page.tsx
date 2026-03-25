@@ -188,12 +188,15 @@ export default function NotesPage() {
           });
           return { ...prev, updatedAt: res.data.updatedAt };
         });
-        // Also update the note in the sidebar list from PATCH response
-        setNotes(prev => prev.map(n => n.id === noteId ? res.data : n));
+        // Only sync metadata, preserve local content
+        setNotes(prev => prev.map(n =>
+          n.id === noteId
+            ? { ...n, title: res.data.title, updatedAt: res.data.updatedAt, pinned: res.data.pinned }
+            : n
+        ));
       } else {
         console.error('[NEXUS_DEBUG] triggerApiSave FAILED', res);
       }
-      void fetchNotes(search);
     } catch (err) {
       setSaving(false);
       console.error('[NEXUS_DEBUG] triggerApiSave ERROR', err);
