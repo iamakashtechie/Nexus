@@ -36,8 +36,16 @@ function extractTextFromRichContent(node: unknown): string {
 
 function getMarkdownValue(note: NoteWithTags | null): string {
   if (!note) return "";
-  if (note.markdownContent && note.markdownContent.trim().length > 0) return note.markdownContent;
-  return extractTextFromRichContent(note.content).trim();
+  const hasMd = note.markdownContent && note.markdownContent.trim().length > 0;
+  const result = hasMd ? note.markdownContent! : extractTextFromRichContent(note.content).trim();
+  console.log('[NEXUS_DEBUG] getMarkdownValue', {
+    noteId: note.id,
+    hasMarkdownContent: hasMd,
+    markdownContentLength: note.markdownContent?.length ?? 0,
+    resultLength: result.length,
+    resultPreview: result.slice(0, 80),
+  });
+  return result;
 }
 
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
@@ -96,12 +104,24 @@ export default function NotesPage() {
 
   const fetchNotes = useCallback(
     async (q?: string) => {
+      console.log('[NEXUS_DEBUG] fetchNotes called', { query: q });
       setLoadingNotes(true);
       const params = q ? `?q=${encodeURIComponent(q)}` : "";
       const res = await apiFetch<{ success: boolean; data: NoteWithTags[] }>(
         `/api/notes${params}`
       );
-      if (res.success) setNotes(res.data);
+      if (res.success) {
+        console.log('[NEXUS_DEBUG] fetchNotes response', {
+          count: res.data.length,
+          notesPreviews: res.data.slice(0, 3).map(n => ({
+            id: n.id,
+            title: n.title,
+            markdownContentLength: n.markdownContent?.length ?? 0,
+            contentKeys: n.content ? Object.keys(n.content as object) : null,
+          })),
+        });
+        setNotes(res.data);
+      }
       setLoadingNotes(false);
     },
     [apiFetch]
@@ -113,6 +133,7 @@ export default function NotesPage() {
   }, [fetchNotes, fetchNotebooks]);
 
   async function createNote() {
+    console.log('[NEXUS_DEBUG] createNote called');
     const res = await apiFetch<{ success: boolean; data: NoteWithTags }>(
       "/api/notes",
       {
@@ -126,40 +147,83 @@ export default function NotesPage() {
       }
     );
     if (res.success) {
+      console.log('[NEXUS_DEBUG] createNote success', {
+        id: res.data.id,
+        title: res.data.title,
+        fileType: res.data.fileType,
+        markdownContent: res.data.markdownContent,
+        contentType: (res.data.content as any)?.type,
+      });
       setNotes((prev) => [res.data, ...prev]);
       setActiveNote(res.data);
       setIsEditing(true);
+    } else {
+      console.error('[NEXUS_DEBUG] createNote FAILED', res);
     }
   }
 
   const triggerApiSave = useCallback(async (noteId: string, payload: any) => {
+    console.log('[NEXUS_DEBUG] triggerApiSave START', { noteId, payload });
     setSaving(true);
-    const res = await apiFetch<{ success: boolean; data: NoteWithTags }>(`/api/notes/${noteId}`, {
-      method: "PATCH",
-      body: JSON.stringify(payload),
-    });
-    setSaving(false);
-    setHasUnsavedChanges(false);
-    // Sync activeNote with server-returned data to prevent stale content on re-click
-    if (res.success) {
-      setActiveNote(prev => prev?.id === noteId ? { ...prev, ...res.data } : prev);
+    try {
+      const res = await apiFetch<{ success: boolean; data: NoteWithTags }>(`/api/notes/${noteId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      setSaving(false);
+      setHasUnsavedChanges(false);
+      if (res.success) {
+        console.log('[NEXUS_DEBUG] triggerApiSave SUCCESS', {
+          noteId,
+          serverTitle: res.data.title,
+          serverMarkdownLen: res.data.markdownContent?.length ?? 0,
+          serverContentType: (res.data.content as any)?.type,
+        });
+        // Only sync metadata (updatedAt) — never overwrite local content edits
+        setActiveNote(prev => {
+          if (prev?.id !== noteId) return prev;
+          console.log('[NEXUS_DEBUG] triggerApiSave merging updatedAt only', {
+            localMarkdownLen: prev.markdownContent?.length ?? 0,
+            serverMarkdownLen: res.data.markdownContent?.length ?? 0,
+          });
+          return { ...prev, updatedAt: res.data.updatedAt };
+        });
+        // Also update the note in the sidebar list from PATCH response
+        setNotes(prev => prev.map(n => n.id === noteId ? res.data : n));
+      } else {
+        console.error('[NEXUS_DEBUG] triggerApiSave FAILED', res);
+      }
+      void fetchNotes(search);
+    } catch (err) {
+      setSaving(false);
+      console.error('[NEXUS_DEBUG] triggerApiSave ERROR', err);
     }
-    void fetchNotes(search);
   }, [apiFetch, fetchNotes, search]);
 
   const autoSave = useCallback(
     (noteId: string, field: "title" | "content" | "markdownContent" | "fileType", value: unknown) => {
       setHasUnsavedChanges(true);
-      if (!autoSaveEnabled) return;
+      if (!autoSaveEnabled) {
+        console.log('[NEXUS_DEBUG] autoSave SKIPPED (disabled)', { field });
+        return;
+      }
 
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       // Store latest pending payload to avoid stale closure
       pendingPayloadRef.current = { noteId, field, value };
+      console.log('[NEXUS_DEBUG] autoSave SCHEDULED', {
+        noteId,
+        field,
+        valuePreview: typeof value === 'string' ? value.slice(0, 60) : '(object)',
+      });
       const t = setTimeout(() => {
         const p = pendingPayloadRef.current;
         if (p) {
+          console.log('[NEXUS_DEBUG] autoSave FIRING after 1000ms', { field: p.field });
           pendingPayloadRef.current = null;
           void triggerApiSave(p.noteId, { [p.field]: p.value });
+        } else {
+          console.log('[NEXUS_DEBUG] autoSave SKIPPED (no pending payload)');
         }
       }, 1000);
       saveTimeoutRef.current = t;
@@ -175,6 +239,7 @@ export default function NotesPage() {
   }, []);
 
   const closeActiveNote = useCallback(() => {
+    console.log('[NEXUS_DEBUG] closeActiveNote', { noteId: activeNote?.id });
     if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); saveTimeoutRef.current = null; }
     pendingPayloadRef.current = null;
     setNotes((prev) => {
@@ -187,6 +252,10 @@ export default function NotesPage() {
   }, [activeNote]);
 
   const handleManualSave = async () => {
+    console.log('[NEXUS_DEBUG] handleManualSave called', {
+      noteId: activeNote?.id,
+      hasUnsavedChanges,
+    });
     // Flush any pending debounced save
     if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); saveTimeoutRef.current = null; }
     pendingPayloadRef.current = null;
@@ -196,13 +265,15 @@ export default function NotesPage() {
       fileType: activeNote.fileType,
     });
 
-    await triggerApiSave(activeNote.id, {
+    const savePayload = {
       title: activeNote.title,
       fileType: resolvedFileType,
       ...(resolvedFileType === ".md"
         ? { markdownContent: activeNote.markdownContent ?? "" }
         : { content: activeNote.content }),
-    });
+    };
+    console.log('[NEXUS_DEBUG] handleManualSave payload', savePayload);
+    await triggerApiSave(activeNote.id, savePayload);
   };
 
   async function deleteNote(id: string) {
@@ -527,6 +598,13 @@ export default function NotesPage() {
             <div
               key={note.id}
               onClick={() => {
+                console.log('[NEXUS_DEBUG] note clicked', {
+                  clickedId: note.id,
+                  clickedTitle: note.title,
+                  clickedMarkdownLen: note.markdownContent?.length ?? 0,
+                  currentActiveId: activeNote?.id,
+                  currentActiveMarkdownLen: activeNote?.markdownContent?.length ?? 0,
+                });
                 // Clear any pending debounced save from previous note
                 if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); saveTimeoutRef.current = null; }
                 pendingPayloadRef.current = null;

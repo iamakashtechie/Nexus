@@ -85,6 +85,18 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
 
     const { title, content, fileType, markdownContent, notebookId, pinned, tags } = parsed.data;
+    console.log('[NEXUS_DEBUG_SERVER] PATCH received', {
+      id,
+      fieldsPresent: {
+        title: title !== undefined,
+        content: content !== undefined,
+        fileType: fileType !== undefined,
+        markdownContent: markdownContent !== undefined,
+        notebookId: notebookId !== undefined,
+        pinned: pinned !== undefined,
+      },
+      markdownContentLen: markdownContent?.length ?? 'undefined',
+    });
     const fileTypeFromPayload = fileType !== undefined ? normalizeFileType(fileType) : undefined;
     const existingFileType = resolveNoteFileType({ title: existing.title, fileType: ".md" });
 
@@ -156,6 +168,12 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       });
     }
 
+    console.log('[NEXUS_DEBUG_SERVER] PATCH success', {
+      id,
+      savedTitle: (note as any).title,
+      savedFileType: (note as any).fileType,
+      savedMarkdownLen: (note as any).markdownContent?.length ?? 'null',
+    });
     return NextResponse.json({ success: true, data: note });
   } catch (error) {
     console.error("[PATCH /api/notes/:id]", error);

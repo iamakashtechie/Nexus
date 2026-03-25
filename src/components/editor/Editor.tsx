@@ -35,11 +35,17 @@ export default function Editor({ content, onChange, editable = true }: EditorPro
     onCreate({ editor }) {
       initialContentStr.current = JSON.stringify(editor.getJSON());
       isInitialized.current = true;
+      console.log('[NEXUS_DEBUG] Editor onCreate', { contentLength: initialContentStr.current.length });
     },
     onUpdate({ editor }) {
       if (!isInitialized.current) return;
       const currentJson = editor.getJSON();
-      if (JSON.stringify(currentJson) === initialContentStr.current) return;
+      const currentStr = JSON.stringify(currentJson);
+      if (currentStr === initialContentStr.current) {
+        console.log('[NEXUS_DEBUG] Editor onUpdate SKIPPED (matches initial)');
+        return;
+      }
+      console.log('[NEXUS_DEBUG] Editor onUpdate FIRING onChange');
       onChange(currentJson);
     },
   });
@@ -54,6 +60,10 @@ export default function Editor({ content, onChange, editable = true }: EditorPro
     if (!editor || !isInitialized.current) return;
     const incomingStr = JSON.stringify(content);
     if (incomingStr === initialContentStr.current) return;
+    console.log('[NEXUS_DEBUG] Editor content sync FIRING', {
+      oldLen: initialContentStr.current.length,
+      newLen: incomingStr.length,
+    });
     initialContentStr.current = incomingStr;
     editor.commands.setContent(content);
   }, [editor, content]);
