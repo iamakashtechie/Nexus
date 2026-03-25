@@ -69,7 +69,7 @@ export default function NotesPage() {
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pendingPayloadRef = useRef<{ noteId: string; field: string; value: unknown } | null>(null);
+  const pendingPayloadRef = useRef<{ noteId: string; payload: Record<string, any> } | null>(null);
 
   // Notebooks / Folders
   type NotebookWithCount = Notebook & { _count: { notes: number } };
@@ -209,19 +209,24 @@ export default function NotesPage() {
       }
 
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      // Store latest pending payload to avoid stale closure
-      pendingPayloadRef.current = { noteId, field, value };
+      
+      // Accumulate fields to avoid dropping edits if multiple fields change within 1000ms
+      if (pendingPayloadRef.current?.noteId === noteId) {
+        pendingPayloadRef.current.payload[field] = value;
+      } else {
+        pendingPayloadRef.current = { noteId, payload: { [field]: value } };
+      }
+
       console.log('[NEXUS_DEBUG] autoSave SCHEDULED', {
         noteId,
-        field,
-        valuePreview: typeof value === 'string' ? value.slice(0, 60) : '(object)',
+        fields: Object.keys(pendingPayloadRef.current.payload),
       });
       const t = setTimeout(() => {
         const p = pendingPayloadRef.current;
-        if (p) {
-          console.log('[NEXUS_DEBUG] autoSave FIRING after 1000ms', { field: p.field });
+        if (p && Object.keys(p.payload).length > 0) {
+          console.log('[NEXUS_DEBUG] autoSave FIRING after 1000ms', { fields: Object.keys(p.payload) });
           pendingPayloadRef.current = null;
-          void triggerApiSave(p.noteId, { [p.field]: p.value });
+          void triggerApiSave(p.noteId, p.payload);
         } else {
           console.log('[NEXUS_DEBUG] autoSave SKIPPED (no pending payload)');
         }
@@ -231,17 +236,27 @@ export default function NotesPage() {
     [autoSaveEnabled, triggerApiSave]
   );
 
-  // Clear pending debounced save on unmount
+  // Clear and flush pending debounced save on unmount
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      const p = pendingPayloadRef.current;
+      if (p && Object.keys(p.payload).length > 0) {
+         void triggerApiSave(p.noteId, p.payload);
+      }
     };
-  }, []);
+  }, [triggerApiSave]);
 
   const closeActiveNote = useCallback(() => {
     console.log('[NEXUS_DEBUG] closeActiveNote', { noteId: activeNote?.id });
-    if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); saveTimeoutRef.current = null; }
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    const p = pendingPayloadRef.current;
+    if (p && Object.keys(p.payload).length > 0) {
+      void triggerApiSave(p.noteId, p.payload);
+    }
     pendingPayloadRef.current = null;
+    saveTimeoutRef.current = null;
+    
     setNotes((prev) => {
       if (!activeNote) return prev;
       return prev.map((note) =>
@@ -600,14 +615,25 @@ export default function NotesPage() {
               onClick={() => {
                 console.log('[NEXUS_DEBUG] note clicked', {
                   clickedId: note.id,
-                  clickedTitle: note.title,
-                  clickedMarkdownLen: note.markdownContent?.length ?? 0,
                   currentActiveId: activeNote?.id,
-                  currentActiveMarkdownLen: activeNote?.markdownContent?.length ?? 0,
                 });
-                // Clear any pending debounced save from previous note
-                if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); saveTimeoutRef.current = null; }
+                
+                // If clicking the current note, just switch to view mode 
+                // DO NOT overwrite activeNote with the list version (which may be stale)
+                if (activeNote?.id === note.id) {
+                  setIsEditing(false);
+                  return;
+                }
+
+                // If switching to a different note, flush any pending save
+                if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                const p = pendingPayloadRef.current;
+                if (p && Object.keys(p.payload).length > 0) {
+                  void triggerApiSave(p.noteId, p.payload);
+                }
+                saveTimeoutRef.current = null;
                 pendingPayloadRef.current = null;
+                
                 setActiveNote(note);
                 setIsEditing(false);
               }}
