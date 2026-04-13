@@ -24,7 +24,7 @@ export function ContextMenu({ x, y, items, onClose, placement = "right" }: Conte
   const [position, setPosition] = useState({ left: x, top: y });
 
   const handleClickOutside = useCallback(
-    (e: MouseEvent) => {
+    (e: MouseEvent | TouchEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     },
     [onClose]
@@ -32,6 +32,7 @@ export function ContextMenu({ x, y, items, onClose, placement = "right" }: Conte
 
   useEffect(() => {
     document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
     document.addEventListener("contextmenu", handleClickOutside);
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -39,6 +40,7 @@ export function ContextMenu({ x, y, items, onClose, placement = "right" }: Conte
     document.addEventListener("keydown", handleEsc);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
       document.removeEventListener("contextmenu", handleClickOutside);
       document.removeEventListener("keydown", handleEsc);
     };

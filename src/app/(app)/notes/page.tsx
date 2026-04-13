@@ -7,6 +7,7 @@ import type { NoteWithTags } from "@/types";
 import type { Notebook } from "@prisma/client";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 import { ContextMenu, type MenuItem } from "@/components/ui/ContextMenu";
+import { BottomSheet, type SheetItem } from "@/components/ui/BottomSheet";
 import {
   normalizeFileType,
   normalizeNoteTitle,
@@ -81,8 +82,15 @@ export default function NotesPage() {
   const [renameFolderName, setRenameFolderName] = useState("");
   const [toasts, setToasts] = useState<Array<{ id: number; message: string; tone: "info" | "success" | "error" }>>([]);
 
-  // Context menu
+  // Context menu (desktop)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: MenuItem[]; placement?: "right" | "left" } | null>(null);
+  
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Mobile bottom sheet
+  const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
+  const [bottomSheetItems, setBottomSheetItems] = useState<SheetItem[]>([]);
+  const [bottomSheetTitle, setBottomSheetTitle] = useState<string>("");
 
   const isMarkdownNote = activeNote
     ? resolveNoteFileType({ title: activeNote.title, fileType: activeNote.fileType }) === ".md"
@@ -143,6 +151,7 @@ export default function NotesPage() {
           fileType: ".md",
           markdownContent: "",
           content: { type: "doc", content: [{ type: "paragraph" }] },
+          ...(activeNotebookId ? { notebookId: activeNotebookId } : {}),
         }),
       }
     );
@@ -250,26 +259,20 @@ export default function NotesPage() {
     };
   }, [triggerApiSave]);
 
-  const closeActiveNote = useCallback(() => {
-    console.log('[NEXUS_DEBUG] closeActiveNote', { noteId: activeNote?.id });
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    const p = pendingPayloadRef.current;
-    if (p && Object.keys(p.payload).length > 0) {
-      void triggerApiSave(p.noteId, p.payload);
-    }
-    pendingPayloadRef.current = null;
-    saveTimeoutRef.current = null;
-    
-    setNotes((prev) => {
-      if (!activeNote) return prev;
-      return prev.map((note) =>
-        note.id === activeNote.id ? { ...note, ...activeNote } : note
-      );
-    });
-    setActiveNote(null);
-  }, [activeNote]);
+  // Prevent tab closing/refreshing if there are manual unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges && !autoSaveEnabled && activeNote) {
+        e.preventDefault();
+        e.returnValue = ""; // Required for Chrome
+        return "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges, autoSaveEnabled, activeNote]);
 
-  const handleManualSave = async () => {
+  const handleManualSave = useCallback(async () => {
     console.log('[NEXUS_DEBUG] handleManualSave called', {
       noteId: activeNote?.id,
       hasUnsavedChanges,
@@ -292,7 +295,35 @@ export default function NotesPage() {
     };
     console.log('[NEXUS_DEBUG] handleManualSave payload', savePayload);
     await triggerApiSave(activeNote.id, savePayload);
-  };
+  }, [activeNote, hasUnsavedChanges, triggerApiSave]);
+
+  const closeActiveNote = useCallback(async () => {
+    if (hasUnsavedChanges && !autoSaveEnabled && activeNote) {
+      const wantsToSave = window.confirm(`File '${activeNote.title}' not saved. Do you want to save it?\n\n(OK = Yes, Cancel = No)`);
+      if (wantsToSave) {
+        await handleManualSave();
+      } else {
+        setHasUnsavedChanges(false);
+      }
+    }
+
+    console.log('[NEXUS_DEBUG] closeActiveNote', { noteId: activeNote?.id });
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    const p = pendingPayloadRef.current;
+    if (p && Object.keys(p.payload).length > 0) {
+      void triggerApiSave(p.noteId, p.payload);
+    }
+    pendingPayloadRef.current = null;
+    saveTimeoutRef.current = null;
+    
+    setNotes((prev) => {
+      if (!activeNote) return prev;
+      return prev.map((note) =>
+        note.id === activeNote.id ? { ...note, ...activeNote } : note
+      );
+    });
+    setActiveNote(null);
+  }, [activeNote, hasUnsavedChanges, autoSaveEnabled, handleManualSave, triggerApiSave]);
 
   async function deleteNote(id: string) {
     await apiFetch(`/api/notes/${id}`, { method: "DELETE" });
@@ -422,7 +453,7 @@ export default function NotesPage() {
         .get("content-disposition")
         ?.match(/filename=\"?([^\";]+)\"?/)?.[1] ?? `${nb.name}.zip`;
     saveBlob(blob, fileName);
-    showToast("Folder backup downloaded.", "success");
+    showToast("Folder download started.", "success");
   }
 
   // Note context menu builder
@@ -452,6 +483,43 @@ export default function NotesPage() {
     ];
   }
 
+  // Mobile bottom sheet items builder for notes
+  function openNoteActionsSheet(note: NoteWithTags) {
+    const items: SheetItem[] = [
+      {
+        label: note.pinned ? "Unpin Note" : "Pin Note",
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill={note.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>
+          </svg>
+        ),
+        onClick: () => togglePin(note),
+      },
+      {
+        label: "Download",
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        ),
+        onClick: () => void downloadNoteFile(note),
+      },
+      {
+        label: "Delete Note",
+        icon: (
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+          </svg>
+        ),
+        danger: true,
+        onClick: () => { if (confirm("Delete this note?")) deleteNote(note.id); },
+      },
+    ];
+    setBottomSheetTitle("Note Actions");
+    setBottomSheetItems(items);
+    setBottomSheetOpen(true);
+  }
+
   async function logout() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -472,14 +540,20 @@ export default function NotesPage() {
     <div className="flex h-screen overflow-hidden bg-bg text-text selection:bg-accent/20 selection:text-text">
 
       {/* Sidebar */}
-      <aside className={`flex-col w-full md:w-72 shrink-0 border-r border-border bg-surface ${activeNote ? 'hidden md:flex' : 'flex'}`}>
+      <aside className={`flex-col w-full md:w-72 shrink-0 border-r border-border bg-surface relative ${activeNote ? 'hidden md:flex' : 'flex'}`}>
         {/* Header content minimalized */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0 z-10 bg-surface">
           <div className="flex items-center gap-2">
+            <button 
+              className="md:hidden p-1.5 -ml-1 text-muted hover:text-text transition-colors rounded-md"
+              onClick={() => setIsSidebarOpen(true)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+            </button>
             <div className="w-5 h-5 rounded-[4px] bg-text text-bg flex items-center justify-center font-bold text-[10px] tracking-tighter">N</div>
             <span className="font-semibold text-sm tracking-tight text-text">Nexus</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-1">
             <ThemeSwitcher />
             <button
               data-testid="new-note-btn"
@@ -498,6 +572,25 @@ export default function NotesPage() {
             </button>
           </div>
         </div>
+
+        {/* Mobile Sidebar Overlay */}
+        {isSidebarOpen && (
+          <div 
+            className="md:hidden fixed inset-0 bg-bg/80 backdrop-blur-sm z-[100]" 
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* Drawer Wrapper for Mobile, inline for Desktop */}
+        <div className={`fixed inset-y-0 left-0 z-[110] w-64 bg-surface border-r border-border transform transition-transform duration-300 md:static md:w-auto md:z-auto md:border-none md:transform-none md:transition-none flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+          <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
+            <span className="font-semibold text-sm">Menu</span>
+            <button onClick={() => setIsSidebarOpen(false)} className="p-1.5 -mr-1.5 rounded-md text-muted hover:text-text bg-surface-hover transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto">
 
         {/* Search */}
         <div className="px-3 py-2">
@@ -523,12 +616,15 @@ export default function NotesPage() {
             <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider">Folders</h3>
           </div>
           <button
-            onClick={() => setActiveNotebookId(null)}
-            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-md transition-colors ${
+            onClick={() => {
+              setActiveNotebookId(null);
+              setIsSidebarOpen(false);
+            }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs rounded-lg transition-colors min-h-[40px] ${
               activeNotebookId === null ? 'bg-surface-hover/80 text-text font-medium' : 'text-muted hover:bg-surface-hover/50 hover:text-text'
             }`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
             All Notes
           </button>
           {notebooks.map(nb => (
@@ -548,17 +644,20 @@ export default function NotesPage() {
                 </form>
               ) : (
                 <button
-                  onClick={() => setActiveNotebookId(nb.id)}
+                  onClick={() => {
+                    setActiveNotebookId(nb.id);
+                    setIsSidebarOpen(false);
+                  }}
                   onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, items: buildFolderContextMenu(nb) }); }}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs rounded-md transition-colors ${
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 text-xs rounded-lg transition-colors min-h-[40px] ${
                     activeNotebookId === nb.id ? 'bg-surface-hover/80 text-text font-medium' : 'text-muted hover:bg-surface-hover/50 hover:text-text'
                   }`}
                 >
-                  <span className="flex items-center gap-2 truncate">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+                  <span className="flex items-center gap-2.5 truncate">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
                     {nb.name}
                   </span>
-                  <span className="text-[10px] text-muted/50 tabular-nums">{nb._count.notes}</span>
+                  <span className="text-[10px] text-muted/50 tabular-nums px-1.5 py-0.5 bg-surface-hover/50 rounded-md">{nb._count.notes}</span>
                 </button>
               )}
             </div>
@@ -580,25 +679,37 @@ export default function NotesPage() {
           ) : (
             <button
               onClick={() => setCreatingFolder(true)}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted/50 hover:text-muted hover:bg-surface-hover/50 rounded-md transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-muted/50 hover:text-muted hover:bg-surface-hover/50 rounded-lg transition-colors min-h-[40px]"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
               New Folder
             </button>
           )}
         </div>
 
+          </div> {/* End of Drawer inner scroll */}
+          
+          {/* Settings in Drawer Footer (Mobile Only) */}
+          <div className="md:hidden p-4 border-t border-border/50 flex items-center justify-between shrink-0">
+             <ThemeSwitcher />
+             <button onClick={logout} className="text-[13px] text-muted flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                Logout
+             </button>
+          </div>
+        </div> {/* End of Drawer Wrapper */}
+
         {/* Notes list */}
-        <div className="flex-1 overflow-y-auto px-2 pb-4 pt-2">
+        <div className="flex-1 overflow-y-auto px-2 pb-24 md:pb-4 pt-2 bg-surface">
           <div className="px-2 pb-1 flex items-center justify-between">
             <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider">Notes</h3>
             <button
               onClick={() => fetchNotes(search)}
-              className="p-1 rounded-md text-muted hover:text-text hover:bg-surface-hover transition-colors"
+              className="p-2 rounded-lg text-muted hover:text-text hover:bg-surface-hover transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
               title="Refresh notes"
               aria-label="Refresh notes"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={loadingNotes ? "animate-spin" : ""}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={loadingNotes ? "animate-spin" : ""}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
             </button>
           </div>
           {loadingNotes ? (
@@ -615,17 +726,26 @@ export default function NotesPage() {
           {filtered.map((note) => (
             <div
               key={note.id}
-              onClick={() => {
+              onClick={async () => {
                 console.log('[NEXUS_DEBUG] note clicked', {
                   clickedId: note.id,
                   currentActiveId: activeNote?.id,
                 });
-                
-                // If clicking the current note, just switch to view mode 
+
+                // If clicking the current note, just switch to view mode
                 // DO NOT overwrite activeNote with the list version (which may be stale)
                 if (activeNote?.id === note.id) {
                   setIsEditing(false);
                   return;
+                }
+
+                if (hasUnsavedChanges && !autoSaveEnabled && activeNote) {
+                  const wantsToSave = window.confirm(`File '${activeNote.title}' not saved. Do you want to save it?\n\n(OK = Yes, Cancel = No)`);
+                  if (wantsToSave) {
+                    await handleManualSave();
+                  } else {
+                    setHasUnsavedChanges(false);
+                  }
                 }
 
                 // If switching to a different note, flush any pending save
@@ -636,7 +756,7 @@ export default function NotesPage() {
                 }
                 saveTimeoutRef.current = null;
                 pendingPayloadRef.current = null;
-                
+
                 setActiveNote(note);
                 setIsEditing(false);
               }}
@@ -644,7 +764,7 @@ export default function NotesPage() {
                 e.preventDefault();
                 setCtxMenu({ x: e.clientX, y: e.clientY, items: buildNoteContextMenu(note) });
               }}
-              className={`group relative flex items-start gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-all mb-0.5 ${
+              className={`group relative flex items-center gap-2.5 px-3 py-3 rounded-lg cursor-pointer transition-all mb-1 min-h-[56px] ${
                 activeNote?.id === note.id
                   ? "bg-surface-hover/80 text-text"
                   : "hover:bg-surface-hover/50 text-text/80"
@@ -664,24 +784,24 @@ export default function NotesPage() {
                 </div>
               </div>
 
-              {/* Actions: three-dot on mobile, hover actions on desktop */}
+              {/* Actions: three-dot on mobile (opens bottom sheet), hover actions on desktop */}
               <button
-                className="md:hidden p-1 text-muted"
+                className="md:hidden p-2 -mr-1.5 text-muted min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-surface-hover transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const rect = (e.target as HTMLElement).getBoundingClientRect();
-                  setCtxMenu({ x: rect.left, y: rect.bottom, items: buildNoteContextMenu(note), placement: "left" });
+                  openNoteActionsSheet(note);
                 }}
+                aria-label="Note actions"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
               </button>
-              <div className="hidden group-hover:flex items-center gap-1 shrink-0 bg-gradient-to-l from-surface-hover pl-4 pr-1">
+              <div className="hidden group-hover:flex items-center gap-0.5 shrink-0 bg-gradient-to-l from-surface-hover via-surface-hover to-transparent pl-6 pr-1">
                 <button
                   onClick={(e) => { e.stopPropagation(); togglePin(note); }}
-                  className="text-muted hover:text-accent p-1 rounded-md transition-colors"
+                  className="text-muted hover:text-accent p-2 rounded-lg transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
                   title={note.pinned ? "Unpin" : "Pin"}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill={note.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={note.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
                 </button>
                 <button
                   onClick={(e) => {
@@ -689,21 +809,38 @@ export default function NotesPage() {
                     const rect = (e.target as HTMLElement).getBoundingClientRect();
                     setCtxMenu({ x: rect.left, y: rect.bottom, items: buildNoteContextMenu(note), placement: "left" });
                   }}
-                  className="text-muted hover:text-text p-1 rounded-md transition-colors"
+                  className="text-muted hover:text-text p-2 rounded-lg transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
                   title="More"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                 </button>
               </div>
             </div>
           ))}
         </div>
+
+        {/* Mobile FAB */}
+        <button
+          onClick={createNote}
+          className="md:hidden fixed bottom-6 right-6 w-14 h-14 rounded-full bg-accent text-bg shadow-lg flex items-center justify-center active:scale-95 transition-transform z-40"
+          title="New Note"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        </button>
       </aside>
 
       {/* Context Menu Portal */}
       {ctxMenu && (
         <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} placement={ctxMenu.placement} onClose={() => setCtxMenu(null)} />
       )}
+
+      {/* Mobile Bottom Sheet */}
+      <BottomSheet
+        isOpen={bottomSheetOpen}
+        onClose={() => setBottomSheetOpen(false)}
+        title={bottomSheetTitle}
+        items={bottomSheetItems}
+      />
 
       {/* Download toasts */}
       <div className="pointer-events-none fixed bottom-4 right-4 z-[1200] flex w-[min(92vw,340px)] flex-col gap-2">
@@ -728,23 +865,22 @@ export default function NotesPage() {
         {activeNote ? (
           <>
             {/* Note header / top bar */}
-            <header className="flex items-center justify-between px-4 md:px-8 py-3 md:py-5 shrink-0 border-b border-transparent md:border-none">
-               {/* Breadcrumbs or Status indicator can go here */}
+            <header className="flex items-center justify-between px-4 md:px-8 py-3 md:py-5 shrink-0 border-b border-border/50 md:border-none">
+               {/* Mobile Back / Desktop Breadcrumbs */}
                <div className="flex items-center gap-2 text-xs text-muted">
                  <button 
                    onClick={closeActiveNote}
-                   className="md:hidden flex items-center gap-1 text-muted hover:text-text px-1 py-1 rounded-md transition-colors"
+                   className="md:hidden flex items-center gap-1 text-muted hover:text-text py-1 pr-1 rounded-md transition-colors"
                   >
-                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-                   Back
+                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
                  </button>
                  <span className="hidden md:inline">{activeNote.notebook?.name || "All Notes"}</span>
                  <span className="hidden md:inline text-border">/</span>
-                 <span className="text-text font-medium truncate max-w-[120px] md:max-w-xs">{normalizeNoteTitle(activeNote.title)}</span>
+                 <span className="text-text font-medium truncate max-w-[150px] md:max-w-xs">{normalizeNoteTitle(activeNote.title)}</span>
                </div>
                
                <div className="flex items-center gap-3">
-                 <label className="flex items-center gap-1.5 cursor-pointer text-xs text-muted hover:text-text transition-colors" title="Toggle Auto-Save">
+                 <label className="hidden md:flex items-center gap-1.5 cursor-pointer text-xs text-muted hover:text-text transition-colors" title="Toggle Auto-Save">
                    <input 
                      type="checkbox" 
                      checked={autoSaveEnabled}
@@ -761,21 +897,21 @@ export default function NotesPage() {
 
                  <div className="w-px h-3 bg-border mx-1"></div>
 
-                 <span className="text-[11px] text-muted flex items-center gap-1.5 min-w-[60px] justify-end">
+                 <span className="text-[11px] text-muted flex items-center gap-1.5 justify-end w-auto md:min-w-[60px]">
                    {saving ? (
                      <>
                        <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
-                       Saving...
+                       <span className="hidden md:inline">Saving...</span>
                      </>
                    ) : hasUnsavedChanges ? (
                      <>
                        <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
-                       Unsaved
+                       <span className="hidden md:inline">Unsaved</span>
                      </>
                    ) : (
                      <>
                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                       Saved
+                       <span className="hidden md:inline">Saved</span>
                      </>
                    )}
                  </span>
@@ -791,8 +927,45 @@ export default function NotesPage() {
                  )}
                  
                  <button onClick={() => setIsEditing(!isEditing)} className={`text-xs font-medium px-3 py-1.5 rounded-md hover:bg-surface-hover transition-colors border ${isEditing ? 'border-border/50 text-text' : 'border-transparent text-muted'}`}>{isEditing ? "View Mode" : "Edit Mode"}</button>
-                  <button className="text-xs font-medium px-3 py-1.5 rounded-md text-text hover:bg-surface-hover transition-colors border border-transparent hidden sm:block">
-                   Share
+                  <button 
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setCtxMenu({
+                        x: rect.right,
+                        y: rect.bottom + 8,
+                        placement: "left",
+                        items: [
+                          {
+                            label: "Export as Markdown (.md)",
+                            icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+                            onClick: () => {
+                              if (!activeNote) return;
+                              const content = activeNote.fileType === ".md" ? activeNote.markdownContent : "(Raw JSON content not suitable for Markdown export)";
+                              const blob = new Blob([content ?? ""], { type: "text/markdown" });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = `${activeNote.title || "Untitled"}.md`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            }
+                          },
+                          {
+                            label: "Export as PDF",
+                            icon: <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>,
+                            onClick: () => {
+                              // Trigger a browser print which we've styled as a PDF export via @media print in globals.css
+                              window.print();
+                            }
+                          }
+                        ]
+                      });
+                    }}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md text-text hover:bg-surface-hover transition-colors border border-transparent hidden sm:block"
+                  >
+                   Export
                  </button>
                </div>
             </header>

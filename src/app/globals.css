@@ -118,6 +118,45 @@ body {
 .tiptap hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
 .tiptap a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
 .tiptap a:hover { color: var(--accent-hover); }
+
+@media print {
+  /* Hide UI elements during print */
+  aside, header, .fixed, .md\:hidden {
+    display: none !important;
+  }
+  
+  /* Reset document for clean printing */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Expand main editor to full width */
+  main {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Reset scrolling so pages break naturally */
+  .overflow-y-auto {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Editor specific styling */
+  .tiptap {
+    font-size: 11pt !important;
+  }
+  .tiptap * {
+    color: black !important;
+  }
+  .tiptap pre {
+    border: 1px solid #ccc !important;
+    background: #f9f9f9 !important;
+  }
+}
 .tiptap img { max-width: 100%; height: auto; border-radius: 8px; margin: 1.5rem 0; }
 
 /* Mermaid diagram container */
