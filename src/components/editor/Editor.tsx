@@ -79,7 +79,7 @@ export default function Editor({ content, onChange, editable = true }: EditorPro
   );
 
   return (
-    <div className="tiptap-wrapper flex-1 flex flex-col h-full min-h-0 border border-border/40 rounded-xl p-3 md:p-4 bg-surface/30 transition-all hover:border-border/60" onKeyDown={handleKeyDown}>
+    <div className="tiptap-wrapper flex-1 flex flex-col h-full min-h-0 border border-border/40 rounded-xl px-5 md:px-8 py-4 md:py-6 bg-surface/30 transition-all hover:border-border/60" onKeyDown={handleKeyDown}>
       <EditorContent
         editor={editor}
         className="tiptap flex-1 flex flex-col h-full text-text min-h-[500px] [&>div]:flex-1 [&>div]:outline-none"

@@ -120,7 +120,7 @@ export function BottomSheet({ isOpen, onClose, title, items }: BottomSheetProps)
 
   return (
     <div
-      className="fixed inset-0 z-50 md:hidden"
+      className="fixed inset-0 z-[150] md:hidden"
       style={{ opacity: isClosing ? 0 : 1, transition: isDragging ? undefined : "opacity 0.2s ease" }}
     >
       {/* Backdrop */}
