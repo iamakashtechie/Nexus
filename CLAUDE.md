@@ -28,7 +28,7 @@ All `db:*` commands use `dotenv -e .env.local` to load environment variables.
 
 ### Auth Flow
 
-- **Secure Single-Password Auth**: No user accounts. Login securely hashes and compares against the `APP_PASSWORD` env var, paired with rate-limiting and lockout mechanisms to prevent brute-force attacks.
+- **Secure Single-Password Auth**: No user accounts. Login securely compares incoming credentials against the `APP_PASSWORD_HASH` bcrypt env var, paired with in-memory rate-limiting to slow brute-force attempts.
 - **JWT tokens** (`jose` library, HS256, 15min expiry) stored in `localStorage` as `nexus_token`.
 - **Dual auth**: API routes check `Authorization: Bearer <token>` header. Page routes check `nexus_token` httpOnly cookie (set on login).
 - **Middleware** (`src/proxy.ts`): Edge-compatible middleware. Public paths: `/login`, `/api/auth`. All other routes require valid JWT.
@@ -78,7 +78,7 @@ All routes follow `ApiResponse<T>` envelope: `{ success: true, data: T }` or `{ 
 
 - `DATABASE_URL`: Neon pooled connection (used by Prisma at runtime)
 - `DIRECT_URL`: Neon direct connection (used by `prisma migrate`)
-- `APP_PASSWORD`: Login passphrase
+- `APP_PASSWORD_HASH`: Bcrypt hash of login passphrase (escape `$` as `\$` in `.env` files)
 - `JWT_SECRET`: Random hex for signing JWTs
 
 ### Path Aliases
@@ -97,4 +97,4 @@ The PATCH `/api/notes/[id]` route contains robust auto-patching logic for Neon/P
 
 ## Deployment
 
-Push to `main` → auto-deploys to Vercel. Set `DATABASE_URL`, `APP_PASSWORD`, `JWT_SECRET` in Vercel dashboard.
+Push to `main` → auto-deploys to Vercel. Set `DATABASE_URL`, `APP_PASSWORD_HASH`, `JWT_SECRET` in Vercel dashboard.

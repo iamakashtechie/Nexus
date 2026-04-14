@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { compare } from "bcryptjs";
 import { signToken } from "@/lib/auth";
+import {
+  checkLoginRateLimit,
+  getClientIp,
+  recordFailedLoginAttempt,
+} from "@/lib/rateLimiter";
 import { loginSchema } from "@/lib/validations";
 
 export async function POST(req: NextRequest) {
@@ -14,7 +20,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (parsed.data.password !== process.env.APP_PASSWORD) {
+    const clientIp = getClientIp(req);
+    const rateLimitResult = checkLoginRateLimit(clientIp);
+
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { success: false, error: "Too many login attempts. Try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimitResult.retryAfterSeconds) },
+        }
+      );
+    }
+
+    const adminPasswordHash = process.env.APP_PASSWORD_HASH;
+
+    if (!adminPasswordHash) {
+      return NextResponse.json(
+        { success: false, error: "Server auth configuration is missing." },
+        { status: 500 }
+      );
+    }
+
+    const passwordMatches = await compare(parsed.data.password, adminPasswordHash);
+
+    if (!passwordMatches) {
+      recordFailedLoginAttempt(clientIp);
       return NextResponse.json(
         { success: false, error: "Invalid password" },
         { status: 401 }
@@ -35,7 +66,8 @@ export async function POST(req: NextRequest) {
     });
 
     return response;
-  } catch {
+  } catch (error) {
+    console.error("Auth route error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }

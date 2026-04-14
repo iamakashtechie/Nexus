@@ -54,7 +54,11 @@ cp .env.example .env.local
 
 Fill in `.env.local`:
 - `DATABASE_URL` — your Neon connection string from https://console.neon.tech
-- `APP_PASSWORD` — the passphrase you want to use to log in
+- `APP_PASSWORD_HASH` — bcrypt hash of your login passphrase, generate with:
+  ```bash
+  node -e "const bcrypt=require('bcryptjs'); const h=bcrypt.hashSync('your-long-secret-passphrase-here',12); console.log(h.replace(/\$/g,'\\$'))"
+  ```
+  This command already prints an `.env`-safe value (with `\$` escaped).
 - `JWT_SECRET` — generate with:
   ```bash
   node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
@@ -94,7 +98,7 @@ npm run test:e2e:ui   # Playwright with browser UI
 2. Import project on https://vercel.com
 3. Add environment variables in Vercel dashboard:
    - `DATABASE_URL`
-   - `APP_PASSWORD`
+  - `APP_PASSWORD_HASH`
    - `JWT_SECRET`
 4. Deploy — done
 

@@ -8,5 +8,5 @@
 - [ ] **Re-link Test Infrastructure:** The `CLAUDE.md` and testing guides mention running unit and E2E tests via `npm test`, but there are no actual test scripts wired up inside the `package.json`. These need to be properly added back into the NPM scripts to run Vitest / Playwright commands.
 
 ## Security
-- [ ] **Secure Admin Password:** Instead of storing the admin password in plaintext in `.env`, store a bcrypt-hashed version. Use a library like `bcrypt` to compare incoming passwords against the hash during login.
-- [ ] **Implement Rate Limiting:** Protect the login route (`/api/login`) against brute-force attacks by implementing rate-limiting (e.g., using Upstash Redis or a standard Next.js rate limiting utility).
+- [x] **Secure Admin Password:** Instead of storing the admin password in plaintext in `.env`, store a bcrypt-hashed version. Use a library like `bcrypt` to compare incoming passwords against the hash during login.
+- [x] **Implement Rate Limiting:** Protect the login route (`/api/login`) against brute-force attacks by implementing rate-limiting (e.g., using Upstash Redis or a standard Next.js rate limiting utility).
