@@ -273,9 +273,9 @@ flowchart TD
   Browser[Browser / Client]
   Browser -->|HTTP / JS| NextApp[Next.js App Router]
   NextApp -->|Middleware| Proxy[Route Protection / JWT]
-  NextApp -->|API Calls| AuthApi[/api/auth]
-  NextApp -->|API Calls| NotesApi[/api/notes*]
-  NextApp -->|API Calls| NotebooksApi[/api/notebooks*]
+  NextApp -->|API Calls| AuthApi["/api/auth"]
+  NextApp -->|API Calls| NotesApi["/api/notes*"]
+  NextApp -->|API Calls| NotebooksApi["/api/notebooks*"]
   NotesApi -->|Prisma| Database[(PostgreSQL)]
   NotebooksApi -->|Prisma| Database
   AuthApi -->|bcrypt + JWT| AuthLib[Auth + Token Logic]
@@ -302,11 +302,11 @@ erDiagram
     String title
     String fileType
     Json content
-    String? markdownContent
+    String markdownContent "optional"
     Boolean pinned
     DateTime createdAt
     DateTime updatedAt
-    String? notebookId
+    String notebookId "optional"
   }
   NOTEBOOK {
     String id
@@ -328,13 +328,13 @@ erDiagram
 
 ```mermaid
 flowchart LR
-  User[User Browser] -->|POST /api/auth| LoginApi[/api/auth]
+  User[User Browser] -->|POST /api/auth| LoginApi["/api/auth"]
   LoginApi -->|validate password| Bcrypt[bcryptjs]
   LoginApi -->|generate token| JWT[jose JWT]
   LoginApi -->|set cookie| Cookie[nexus_token httpOnly]
   User -->|requests page/API| Middleware[proxy.ts middleware]
   Middleware -->|verify token| JWT
-  Middleware -->|allow or redirect| RouteControl[/login or /notes]
+  Middleware -->|allow or redirect| RouteControl["/login or /notes"]
 ```
 
 ### Note Editing Flow
@@ -342,12 +342,12 @@ flowchart LR
 ```mermaid
 flowchart TB
   User -->|select/create note| NotesPage[Notes page]
-  NotesPage -->|fetch| NotesApi[/api/notes]
+  NotesPage -->|fetch| NotesApi["/api/notes"]
   NotesPage -->|render| Editor[Markdown or TipTap editor]
   Editor -->|edit note| LocalState[client state]
-  LocalState -->|debounced save| PatchApi[/api/notes/:id]
+  LocalState -->|debounced save| PatchApi["/api/notes/:id"]
   PatchApi -->|persist| Database
-  NotesPage -->|download| DownloadApi[/api/notes/:id/download]
+  NotesPage -->|download| DownloadApi["/api/notes/:id/download"]
   DownloadApi -->|generate zip/text| BackupLib[backup + zip helpers]
 ```
 
