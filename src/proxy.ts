@@ -7,7 +7,7 @@ const publicRoutes = ['/login'];
 // API routes that shouldn't trigger redirects
 const apiAuthRoutes = ['/api/auth/route', '/api/auth/logout']; 
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Skip middleware for static files, manifest, etc.

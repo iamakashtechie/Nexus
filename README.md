@@ -145,7 +145,7 @@ nexus/
 │   │   └── ui/                   # ThemeProvider, buttons, inputs
 │   ├── hooks/                    # useApi
 │   ├── lib/                      # db, auth, validations
-│   ├── middleware.ts              # JWT route protection
+│   ├── proxy.ts                   # JWT route protection
 │   └── types/                    # Shared TypeScript types
 ├── prisma/
 │   └── schema.prisma
