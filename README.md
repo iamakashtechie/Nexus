@@ -6,6 +6,17 @@ Built with Next.js 14, TypeScript, Tailwind CSS, TipTap, Prisma, and Neon Postgr
 
 ---
 
+## Features
+
+- 📱 **Mobile-First & PWA**: Fully functional Progressive Web App with optimized mobile UI, right-side navigation, and bottom sheet actions.
+- 🔒 **Secure Auth**: Hashed password authentication with robust rate-limiting and security measures.
+- 📝 **Dual Editor Modes**: Support for standard Markdown and rich-text editing (TipTap) with unsaved changes protection.
+- 📤 **Advanced Export**: Export notes in Markdown, PDF, or batch ZIP format.
+- ☁️ **Cloud Native**: PostgreSQL on Neon DB with auto-deployment to Vercel.
+- ⚡ **Smart Routing**: Edge-compatible middleware with automatic root redirects.
+
+---
+
 ## Stack
 
 | Layer       | Technology                        |
@@ -98,6 +109,15 @@ npm run db:studio     # visual database browser (Prisma Studio)
 npm run db:migrate    # run new migrations
 npm run db:push       # push schema changes without migration (dev only)
 ```
+
+---
+
+## Documentation
+
+For further information on architecture, database workflows, and upcoming features, refer to the following files:
+- **[`CLAUDE.md`](./CLAUDE.md)** — Architectural decisions, frontend/backend routing logic, and guidelines for AI assistants navigating the codebase.
+- **[`MIGRATION.md`](./MIGRATION.md)** — Comprehensive guide covering the database migration to Neon DB, along with Prisma schema drift fallback strategies.
+- **[`TODO.md`](./TODO.md)** — Current tasks, planned features, and remaining technical debt to track.
 
 ---
 

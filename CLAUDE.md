@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Nexus is a personal knowledge base / note-taking app. Single-user, self-hosted. Minimal, private. Built with Next.js App Router, TypeScript, Tailwind CSS, TipTap, Prisma, and Neon PostgreSQL.
+Nexus is a personal knowledge base / note-taking app. Single-user, self-hosted. Minimal, private. Built with Next.js App Router, TypeScript, Tailwind CSS, TipTap, Prisma, and Neon PostgreSQL. It features full Progressive Web App (PWA) compatibility, a mobile-first design, and secure routing.
 
 ## Commands
 
@@ -28,7 +28,7 @@ All `db:*` commands use `dotenv -e .env.local` to load environment variables.
 
 ### Auth Flow
 
-- **Single-password auth**: No user accounts. Login compares against `APP_PASSWORD` env var.
+- **Secure Single-Password Auth**: No user accounts. Login securely hashes and compares against the `APP_PASSWORD` env var, paired with rate-limiting and lockout mechanisms to prevent brute-force attacks.
 - **JWT tokens** (`jose` library, HS256, 15min expiry) stored in `localStorage` as `nexus_token`.
 - **Dual auth**: API routes check `Authorization: Bearer <token>` header. Page routes check `nexus_token` httpOnly cookie (set on login).
 - **Middleware** (`src/proxy.ts`): Edge-compatible middleware. Public paths: `/login`, `/api/auth`. All other routes require valid JWT.
@@ -58,10 +58,11 @@ All routes follow `ApiResponse<T>` envelope: `{ success: true, data: T }` or `{ 
 
 ### Frontend Architecture
 
-- **Single-page notes app** (`src/app/(app)/notes/page.tsx`): ~900 line client component managing all state — note list, editor, notebooks/folders, context menus, auto-save, downloads.
+- **Progressive Web App (PWA)**: Fully installable with service workers, manifest files, and comprehensive mobile-first design features including right-side navigation and bottom sheet actions for folders.
+- **Single-page notes app** (`src/app/(app)/notes/page.tsx`): Complex client component managing state for the note list, editor, notebooks/folders, context menus, auto-save, unsaved-changes protection, and exports (Markdown/PDF/ZIP).
 - **Editor** (`src/components/editor/Editor.tsx`): TipTap with StarterKit + CodeBlockLowlight (JS, TS, Python, Bash, CSS). Dynamically imported (no SSR).
 - **Dual editing modes**: Markdown notes use a plain `<textarea>` for editing + ReactMarkdown for viewing. Rich-text notes use TipTap.
-- **Auto-save**: Debounced 1s save with field accumulation (`pendingPayloadRef`). Manual save option when auto-save is disabled.
+- **Auto-save**: Debounced 1s save with field accumulation (`pendingPayloadRef`). Manual save option and route-change protections when auto-save is disabled.
 - **Theme**: 5 themes (light, dark, offwhite, dim, system) via ThemeProvider context + CSS variables in `globals.css`.
 
 ### Key Lib Modules
@@ -86,7 +87,7 @@ All routes follow `ApiResponse<T>` envelope: `{ success: true, data: T }` or `{ 
 
 ### Production Quirks
 
-The PATCH `/api/notes/[id]` route contains auto-patching logic for Neon/Prisma schema drift — it catches errors for missing `fileType`/`markdownContent` columns and falls back to `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` or omits those fields. This handles cases where the Prisma client on Vercel is stale relative to the schema.
+The PATCH `/api/notes/[id]` route contains robust auto-patching logic for Neon/Prisma schema drift (specifically handling cases where `markdownContent` might be silently dropped during fallback if the Prisma client on Vercel is stale relative to the database schema). The database strategy is thoroughly documented in `MIGRATION.md`.
 
 ## Testing
 
