@@ -10,3 +10,4 @@
 ## Security
 - [x] **Secure Admin Password:** Instead of storing the admin password in plaintext in `.env`, store a bcrypt-hashed version. Use a library like `bcrypt` to compare incoming passwords against the hash during login.
 - [x] **Implement Rate Limiting:** Protect the login route (`/api/login`) against brute-force attacks by implementing rate-limiting (e.g., using Upstash Redis or a standard Next.js rate limiting utility).
+- [ ] **Implement Biometric / Fingerprint Login:** Implement WebAuthn (e.g., using `@simplewebauthn/server` and `@simplewebauthn/browser`) to allow logging in via hardware authenticators like laptop fingerprint sensors or Face ID. Requires adding an `Authenticator` table to the database.
