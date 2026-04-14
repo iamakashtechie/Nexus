@@ -14,8 +14,8 @@ const ThemeContext = createContext<ThemeContextType | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "system";
-    return (localStorage.getItem("nexus_theme") as Theme) || "system";
+    if (typeof window === "undefined") return "dark";
+    return (localStorage.getItem("nexus_theme") as Theme) || "dark";
   });
   const [systemIsDark, setSystemIsDark] = useState(() => {
     if (typeof window === "undefined") return false;
