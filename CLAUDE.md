@@ -97,4 +97,4 @@ The PATCH `/api/notes/[id]` route contains robust auto-patching logic for Neon/P
 
 ## Deployment
 
-Push to `main` → auto-deploys to Vercel. Set `DATABASE_URL`, `APP_PASSWORD_HASH`, `JWT_SECRET` in Vercel dashboard.
+Push to `main` → auto-deploys to Vercel. Set `DATABASE_URL`, `APP_PASSWORD_HASH` (unescaped, just `$2b$12$...`), `JWT_SECRET` in Vercel dashboard.

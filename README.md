@@ -98,7 +98,7 @@ npm run test:e2e:ui   # Playwright with browser UI
 2. Import project on https://vercel.com
 3. Add environment variables in Vercel dashboard:
    - `DATABASE_URL`
-  - `APP_PASSWORD_HASH`
+   - `APP_PASSWORD_HASH` (Important: Use the raw hash without `\` escapes here, e.g., `$2b$12$...`)
    - `JWT_SECRET`
 4. Deploy — done
 
