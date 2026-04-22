@@ -668,10 +668,11 @@ export default function NotesPage() {
         </div>
 
         {/* Folders */}
-        <div className="px-2 pt-2 pb-1">
-          <div className="px-2 pb-1">
+        <div className="px-2 pt-2 pb-1 flex flex-col md:max-h-[35vh]">
+          <div className="px-2 pb-1 shrink-0">
             <h3 className="text-[11px] font-semibold text-muted uppercase tracking-wider">Folders</h3>
           </div>
+          <div className="overflow-y-auto overflow-x-auto pr-1 pb-1">
           <button
             onClick={() => {
               setActiveNotebookId(null);
@@ -754,6 +755,7 @@ export default function NotesPage() {
               New Folder
             </button>
           )}
+          </div>
         </div>
 
           </div> {/* End of Drawer inner scroll */}
