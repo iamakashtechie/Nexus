@@ -7,6 +7,8 @@ import {
 } from "@/lib/backup";
 import { createZip } from "@/lib/zip";
 
+export const dynamic = "force-dynamic";
+
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, context: RouteContext) {

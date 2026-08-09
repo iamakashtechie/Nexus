@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken, extractToken } from '@/lib/auth';
 
 // Define public routes that don't require authentication
 const publicRoutes = ['/login'];
@@ -11,7 +11,6 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Skip middleware for static files, manifest, etc.
-  // The matcher below already filters most out, but just to be safe:
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon.ico') ||
@@ -21,9 +20,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get('nexus_token')?.value;
+  const token =
+    request.cookies.get('nexus_token')?.value ||
+    extractToken(request.headers.get('authorization'));
+
   const isAuthRoute = publicRoutes.includes(pathname);
   const isApiAuthRoute = pathname.startsWith('/api/auth');
+  const isApiRoute = pathname.startsWith('/api/');
 
   // Verify the JWT token
   const isValidSession = token ? await verifyToken(token) : null;
@@ -43,8 +46,13 @@ export async function proxy(request: NextRequest) {
 
   // 3. For any other route (Protected), verify authentication
   if (!isValidSession) {
-    // Redirect unauthenticated users to the login page
-    // Using 307 Temporary Redirect is standard
+    if (isApiRoute) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+    // Redirect unauthenticated page users to the login page
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

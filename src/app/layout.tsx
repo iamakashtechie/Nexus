@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
+import { Toaster } from "@/components/ui/Toaster";
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",
@@ -33,6 +34,7 @@ export default function RootLayout({
         <ServiceWorkerRegistrar />
         <ThemeProvider>
           {children}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

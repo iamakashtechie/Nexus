@@ -21,7 +21,7 @@ Write commit messages like commands — not past tense.
 **Trick:**  
 Your message should complete this sentence:
 
-> "If applied, this commit will ___"
+> "If applied, this commit will \_\_\_"
 
 ---
 
@@ -91,8 +91,8 @@ But:
 
 ## 💡 5. Explain "Why", Not "How"
 
-The code shows *what changed*.  
-Your message should explain *why it changed*.
+The code shows _what changed_.  
+Your message should explain _why it changed_.
 
 ❌ Bad:
 
@@ -116,15 +116,15 @@ Critical errors were not noticeable enough to users.
 
 ## 🏷️ 6. Use Conventional Commit Prefixes
 
-| Type      | Purpose                         |
-|-----------|---------------------------------|
-| `feat:`   | New feature                     |
-| `fix:`    | Bug fix                         |
-| `docs:`   | Documentation changes           |
-| `style:`  | Formatting, no code logic       |
-| `refactor:` | Code restructuring            |
-| `test:`   | Add/update tests                |
-| `chore:`  | Maintenance tasks               |
+| Type        | Purpose                   |
+| ----------- | ------------------------- |
+| `feat:`     | New feature               |
+| `fix:`      | Bug fix                   |
+| `docs:`     | Documentation changes     |
+| `style:`    | Formatting, no code logic |
+| `refactor:` | Code restructuring        |
+| `test:`     | Add/update tests          |
+| `chore:`    | Maintenance tasks         |
 
 ---
 

@@ -19,9 +19,11 @@
     "@tiptap/react": "^3.20.4",
     "@tiptap/starter-kit": "^3.20.4",
     "bcryptjs": "^3.0.3",
+    "framer-motion": "^13.0.0",
     "geist": "^1.7.0",
     "jose": "^6.2.2",
     "lowlight": "^3.3.0",
+    "lucide-react": "^1.30.0",
     "mermaid": "^11.13.0",
     "next": "^16.2.3",
     "postcss": "^8.5.8",
@@ -30,6 +32,7 @@
     "react-markdown": "^10.1.0",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
+    "sonner": "^2.0.7",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -42,5 +45,12 @@
     "prisma": "^6.19.2",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.2": true,
+    "@prisma/engines@6.19.3": true,
+    "prisma@6.19.3": true,
+    "sharp@0.35.3": true,
+    "unrs-resolver@1.11.1": true
   }
 }
