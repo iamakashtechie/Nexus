@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import rehypeSanitize from "rehype-sanitize";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { normalizeFileType, normalizeNoteTitle, resolveNoteFileType } from "@/lib/fileType";
 import { EditorSkeleton } from "@/components/ui/Skeleton";
@@ -28,6 +28,16 @@ import { FileText, CornerDownLeft, Copy, Check } from "lucide-react";
 import { MermaidDiagram } from "@/components/editor/MermaidBlock";
 import { CodeBlock } from "@/components/editor/CodeBlock";
 
+const sanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    code: [...(defaultSchema.attributes?.code || []), "className"],
+    span: [...(defaultSchema.attributes?.span || []), "className"],
+    div: [...(defaultSchema.attributes?.div || []), "className"],
+  },
+};
+
 const Editor = dynamic(() => import("@/components/editor/Editor"), {
   ssr: false,
   loading: () => <EditorSkeleton />,
@@ -35,16 +45,36 @@ const Editor = dynamic(() => import("@/components/editor/Editor"), {
 
 function extractTextFromRichContent(node: unknown): string {
   if (!node || typeof node !== "object") return "";
-  const data = node as { type?: string; text?: string; content?: unknown[] };
+  const data = node as {
+    type?: string;
+    text?: string;
+    attrs?: Record<string, unknown>;
+    content?: unknown[];
+  };
   const children = Array.isArray(data.content) ? data.content : [];
-  if (data.type === "text") return data.text ?? "";
   const childText = children.map(extractTextFromRichContent).join("");
-  if (
-    ["paragraph", "heading", "codeBlock", "blockquote", "listItem"].includes(
-      data.type ?? ""
-    )
-  ) {
+
+  if (data.type === "text") return data.text ?? "";
+  if (data.type === "heading") {
+    const level = Number(data.attrs?.level ?? 1);
+    const hashes = "#".repeat(Math.min(6, Math.max(1, level)));
+    return `${hashes} ${childText.trim()}\n\n`;
+  }
+  if (data.type === "blockquote") {
+    return `> ${childText.trim().replace(/\n/g, "\n> ")}\n\n`;
+  }
+  if (data.type === "codeBlock") {
+    const lang = String(data.attrs?.language ?? "");
+    return `\`\`\`${lang}\n${childText}\n\`\`\`\n\n`;
+  }
+  if (data.type === "bulletList" || data.type === "orderedList") {
     return `${childText}\n`;
+  }
+  if (data.type === "listItem") {
+    return `- ${childText.trim()}\n`;
+  }
+  if (data.type === "paragraph") {
+    return `${childText}\n\n`;
   }
   return childText;
 }
@@ -546,7 +576,7 @@ export function NoteEditor({
                   <article className="markdown-preview prose prose-sm max-w-none prose-headings:text-text prose-p:text-text prose-strong:text-text prose-a:text-accent prose-code:text-text prose-pre:bg-surface-hover">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeSanitize]}
+                      rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
                       components={{
                         p: ({ children }) => <p>{renderWikiLinks(children, onWikiLinkClick)}</p>,
                         li: ({ children }) => <li>{renderWikiLinks(children, onWikiLinkClick)}</li>,
