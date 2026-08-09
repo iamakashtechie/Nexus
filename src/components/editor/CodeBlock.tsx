@@ -123,9 +123,9 @@ function CodeBlockShell({
 }) {
   return (
     <div className={`code-block-shell relative my-4 group/codeblock ${className ?? ""}`}>
-      <div className="flex items-center justify-between px-4 py-1.5 rounded-t-xl bg-[#161b22] border border-b-0 border-[#30363d] text-[11px] uppercase tracking-wider text-[#8b949e] font-semibold">
+      <div className="flex items-center justify-between px-4 py-1.5 rounded-t-xl bg-[var(--code-header-bg)] border border-b-0 border-[var(--code-border)] text-[11px] uppercase tracking-wider text-[var(--code-muted)] font-semibold transition-colors">
         <span>{languageLabel}</span>
-        <span className="text-[10px] text-[#6e7681] normal-case tracking-normal">
+        <span className="text-[10px] opacity-75 normal-case tracking-normal">
           {languageClass}
         </span>
       </div>
