@@ -53,17 +53,31 @@ export function useNotes() {
   }, [fetchNotes, debouncedSearch]);
 
   const createNote = useCallback(
-    async (notebookId: string | null) => {
+    async (
+      notebookId: string | null,
+      overrides?: {
+        title?: string;
+        markdownContent?: string;
+        content?: object;
+        fileType?: string;
+      }
+    ) => {
       try {
+        const title = overrides?.title ?? "Untitled.md";
+        const fileType = overrides?.fileType ?? ".md";
         const res = await apiFetch<{ success: boolean; data: NoteWithTags }>(
           "/api/notes",
           {
             method: "POST",
             body: JSON.stringify({
-              title: "Untitled.md",
-              fileType: ".md",
-              markdownContent: "",
-              content: { type: "doc", content: [{ type: "paragraph" }] },
+              title,
+              fileType,
+              markdownContent: overrides?.markdownContent ?? "",
+              content:
+                overrides?.content ?? {
+                  type: "doc",
+                  content: [{ type: "paragraph" }],
+                },
               ...(notebookId ? { notebookId } : {}),
             }),
           }
@@ -111,6 +125,7 @@ export function useNotes() {
                     title: res.data.title,
                     updatedAt: res.data.updatedAt,
                     pinned: res.data.pinned,
+                    tags: res.data.tags,
                   }
                 : n
             )
@@ -127,7 +142,7 @@ export function useNotes() {
   const autoSave = useCallback(
     (
       noteId: string,
-      field: "title" | "content" | "markdownContent" | "fileType",
+      field: "title" | "content" | "markdownContent" | "fileType" | "pinned" | "tags",
       value: unknown
     ) => {
       setHasUnsavedChanges(true);
@@ -265,7 +280,7 @@ export function useNotes() {
   );
 
   const updateActiveNote = useCallback((updater: (n: NoteWithTags) => NoteWithTags) => {
-    setActiveNote((prev) => (prev ? updater(prev) : prev));
+    setActiveNote((prev: any) => (prev ? updater(prev) : prev));
   }, []);
 
   useEffect(() => {

@@ -9,11 +9,15 @@ import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Sidebar } from "@/components/notes/Sidebar";
 import { NoteEditor } from "@/components/notes/NoteEditor";
 import { EditorHeader } from "@/components/notes/EditorHeader";
+import { FloatingCreateButton } from "@/components/notes/FloatingCreateButton";
+import { TemplateManager, applyTemplatePlaceholders, type NoteTemplate } from "@/components/editor/Templates";
+import { toast } from "sonner";
 import { useNotes } from "@/hooks/useNotes";
 import { useNotebooks } from "@/hooks/useNotebooks";
 import { useDownload } from "@/hooks/useDownload";
 import type { NoteWithTags } from "@/types";
 import type { NotebookWithCount } from "@/hooks/useNotebooks";
+import { normalizeNoteTitle } from "@/lib/fileType";
 
 export default function NotesPage() {
   const router = useRouter();
@@ -47,6 +51,8 @@ export default function NotesPage() {
     destructive?: boolean;
     onConfirm: () => void;
   }>({ open: false, title: "", onConfirm: () => {} });
+
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const lastEscRef = useRef<number>(0);
 
@@ -104,6 +110,28 @@ export default function NotesPage() {
     const created = await notes.createNote(activeNotebookId);
     if (created) setIsEditing(true);
   }, [notes, activeNotebookId]);
+
+  const handleCreateFromTemplate = useCallback(
+    async (template: NoteTemplate) => {
+      const title = applyTemplatePlaceholders(template.title || "Untitled");
+      const md = applyTemplatePlaceholders(template.markdownContent ?? "");
+      const created = await notes.createNote(activeNotebookId, {
+        title,
+        markdownContent: md,
+        fileType: ".md",
+      });
+      if (!created) return;
+      setIsEditing(true);
+      toast.success(`Created from "${template.name}"`);
+    },
+    [notes, activeNotebookId]
+  );
+
+  const handleCreateFolder = useCallback(async () => {
+    const name = window.prompt("Folder name");
+    if (!name || !name.trim()) return;
+    await createNotebook(name.trim());
+  }, [createNotebook]);
 
   const handleDownloadNote = useCallback(
     (note: NoteWithTags) => {
@@ -396,6 +424,75 @@ export default function NotesPage() {
                 notes.updateActiveNote((n) => ({ ...n, fileType: ft }));
                 notes.autoSave(notes.activeNote!.id, "fileType", ft);
               }}
+              onTogglePin={() => {
+                if (!notes.activeNote) return;
+                const next = !notes.activeNote.pinned;
+                notes.updateActiveNote((n) => ({ ...n, pinned: next }));
+                notes.autoSave(notes.activeNote.id, "pinned", next);
+              }}
+              onChangeTags={(tags) => {
+                if (!notes.activeNote) return;
+                notes.updateActiveNote((n) => ({
+                  ...n,
+                  tags: tags.map((name) => ({ tag: { id: name, name } })),
+                }));
+                notes.autoSave(notes.activeNote.id, "tags", tags);
+              }}
+              onSelectBacklink={(id) => {
+                const target = notes.notes.find((n) => n.id === id);
+                if (target) {
+                  if (
+                    notes.hasUnsavedChanges &&
+                    !notes.autoSaveEnabled &&
+                    notes.activeNote
+                  ) {
+                    setConfirm({
+                      open: true,
+                      title: `Save changes to "${notes.activeNote.title}"?`,
+                      description:
+                        "You have unsaved changes. Do you want to save them before switching?",
+                      onConfirm: async () => {
+                        await notes.handleManualSave();
+                        notes.switchNote(target);
+                      },
+                    });
+                  } else {
+                    notes.switchNote(target);
+                  }
+                  setIsEditing(false);
+                }
+              }}
+              onWikiLinkClick={(title) => {
+                // Find the note by title (case-insensitive, strip extension)
+                const target = notes.notes.find(
+                  (n) =>
+                    normalizeNoteTitle(n.title).toLowerCase() ===
+                    title.toLowerCase()
+                );
+                if (!target) {
+                  toast.error(`Note "${title}" not found`);
+                  return;
+                }
+                if (
+                  notes.hasUnsavedChanges &&
+                  !notes.autoSaveEnabled &&
+                  notes.activeNote
+                ) {
+                  setConfirm({
+                    open: true,
+                    title: `Save changes to "${notes.activeNote.title}"?`,
+                    description:
+                      "You have unsaved changes. Do you want to save them before switching?",
+                    onConfirm: async () => {
+                      await notes.handleManualSave();
+                      notes.switchNote(target);
+                    },
+                  });
+                } else {
+                  notes.switchNote(target);
+                }
+                setIsEditing(false);
+              }}
             />
           </>
         ) : (
@@ -447,6 +544,22 @@ export default function NotesPage() {
         description={confirm.description}
         destructive={confirm.destructive}
         confirmLabel={confirm.confirmLabel ?? "Confirm"}
+      />
+
+      {templatesOpen && (
+        <TemplateManager
+          onClose={() => setTemplatesOpen(false)}
+          onSelectTemplate={(t) => {
+            void handleCreateFromTemplate(t);
+          }}
+        />
+      )}
+
+      <FloatingCreateButton
+        onCreateBlank={() => void handleCreateNote()}
+        onCreateFromTemplate={() => setTemplatesOpen(true)}
+        onCreateFolder={() => void handleCreateFolder()}
+        hasNotebooks={notebooks.length > 0}
       />
     </div>
   );

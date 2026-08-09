@@ -24,9 +24,27 @@ export async function GET(req: NextRequest) {
     const query = searchParams.get("q");
     const notebookId = searchParams.get("notebookId");
     const tag = searchParams.get("tag");
+    const idsParam = searchParams.get("ids");
+    const titlesParam = searchParams.get("titles");
+    const linkPrefix = searchParams.get("linkPrefix");
+
+    const parsedIds = idsParam
+      ? idsParam.split(",").map((s) => s.trim()).filter(Boolean)
+      : null;
+    const parsedTitles = titlesParam
+      ? titlesParam.split(",").map((s) => s.trim()).filter(Boolean)
+      : null;
 
     const notes = await prisma.note.findMany({
       where: {
+        ...(parsedIds ? { id: { in: parsedIds } } : {}),
+        ...(parsedTitles
+          ? {
+              OR: parsedTitles.map((t) => ({
+                title: { contains: t, mode: "insensitive" },
+              })),
+            }
+          : {}),
         ...(notebookId ? { notebookId } : {}),
         ...(query
           ? { title: { contains: query, mode: "insensitive" } }
@@ -34,12 +52,21 @@ export async function GET(req: NextRequest) {
         ...(tag
           ? { tags: { some: { tag: { name: tag } } } }
           : {}),
+        ...(linkPrefix
+          ? {
+              OR: [
+                { title: { contains: linkPrefix, mode: "insensitive" } },
+                { markdownContent: { contains: `[[${linkPrefix}` } },
+              ],
+            }
+          : {}),
       },
       include: {
         tags: { include: { tag: true } },
         notebook: true,
       },
       orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],
+      take: 20,
     });
 
     return NextResponse.json({ success: true, data: notes });

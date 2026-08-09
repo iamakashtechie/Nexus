@@ -108,3 +108,66 @@ export function CodeBlockWithMermaid(props: NodeViewProps) {
     </NodeViewWrapper>
   );
 }
+
+export function MermaidDiagram({ code }: { code: string }) {
+  const [id] = useState(
+    () => `mermaid-${Math.random().toString(36).slice(2, 9)}`
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [svg, setSvg] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function render() {
+      if (!code.trim()) {
+        setSvg("");
+        setError(null);
+        return;
+      }
+      try {
+        ensureMermaidInit(readColorScheme() === "dark" ? "dark" : "default");
+        const { svg: rendered } = await mermaid.render(
+          `${id}-${Date.now()}`,
+          code.trim()
+        );
+        if (!cancelled) {
+          setSvg(rendered);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Render failed");
+          setSvg("");
+        }
+      }
+    }
+    void render();
+    return () => {
+      cancelled = true;
+    };
+  }, [code, id]);
+
+  return (
+    <div className="mermaid-wrapper my-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] uppercase tracking-wider text-muted font-semibold">
+          Mermaid Diagram
+        </span>
+      </div>
+      <div className="mermaid-content">
+        {error ? (
+          <pre className="text-xs text-red-500 whitespace-pre-wrap font-mono p-2 bg-red-500/10 rounded-lg">
+            {error}
+          </pre>
+        ) : svg ? (
+          <div
+            className="flex justify-center overflow-x-auto p-2"
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        ) : (
+          <div className="text-xs text-muted italic">Rendering diagram…</div>
+        )}
+      </div>
+    </div>
+  );
+}

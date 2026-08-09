@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "../styles/hljs.css";
 
 @theme {
   --color-bg: var(--bg);
@@ -35,7 +37,7 @@
   --surface:   #1A1A1A;
   --surface-hover: #2A2A2A;
   --border:    #2A2A2A;
-  --text:      #EDEDED;
+  --text:      #FFFFFF;
   --muted:     #A1A1AA;
   --accent:    #60A5FA;
   --accent-hover: #93C5FD;
@@ -110,6 +112,8 @@ body {
 .tiptap pre { background: #1E1E1E; border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; overflow-x: auto; margin: 1.5rem 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 .tiptap pre code { background: none; padding: 0; font-size: 0.9rem; color: #E5E5E5; border-radius: 0; font-family: var(--font-mono); }
 .tiptap blockquote { border-left: 3px solid var(--accent); padding-left: 1.25rem; color: var(--muted); margin: 1.5rem 0; font-style: italic; }
+.tiptap ul { list-style-type: disc; }
+.tiptap ol { list-style-type: decimal; }
 .tiptap ul, .tiptap ol { padding-left: 1.5rem; margin: 1rem 0; }
 .tiptap li { margin: 0.25rem 0; line-height: 1.7; }
 .tiptap ul[data-type="taskList"] { list-style: none; padding: 0; }
@@ -118,6 +122,177 @@ body {
 .tiptap hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
 .tiptap a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
 .tiptap a:hover { color: var(--accent-hover); }
+
+/* Markdown preview mode styles */
+.markdown-preview {
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+.markdown-preview p {
+  margin: 0 0 1rem;
+  color: var(--text);
+}
+
+.markdown-preview h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin: 2rem 0 1rem;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.markdown-preview h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.75rem 0 0.75rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.markdown-preview h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.5rem;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.markdown-preview h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.markdown-preview h5,
+.markdown-preview h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+  color: var(--text);
+}
+
+.markdown-preview ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.markdown-preview ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.markdown-preview ul ul,
+.markdown-preview ol ul {
+  list-style-type: circle;
+  margin: 0.25rem 0;
+}
+
+.markdown-preview ul ol,
+.markdown-preview ol ol {
+  list-style-type: lower-alpha;
+  margin: 0.25rem 0;
+}
+
+.markdown-preview li {
+  margin: 0.35rem 0;
+  line-height: 1.6;
+}
+
+.markdown-preview li > p {
+  margin: 0.25rem 0;
+}
+
+.markdown-preview blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 1.25rem;
+  color: var(--muted);
+  margin: 1.5rem 0;
+  font-style: italic;
+}
+
+.markdown-preview code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--surface-hover);
+  padding: 0.2em 0.4em;
+  border-radius: 6px;
+  color: var(--accent);
+}
+
+.markdown-preview pre {
+  background: #1E1E1E;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.markdown-preview pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.9rem;
+  color: #E5E5E5;
+  border-radius: 0;
+  font-family: var(--font-mono);
+}
+
+.markdown-preview hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2rem 0;
+}
+
+.markdown-preview a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-preview a:hover {
+  color: var(--accent-hover);
+}
+
+.markdown-preview table,
+.tiptap table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdown-preview th,
+.markdown-preview td,
+.tiptap th,
+.tiptap td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.markdown-preview th,
+.tiptap th {
+  background: var(--surface-hover);
+  font-weight: 600;
+}
+
+.markdown-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1.5rem 0;
+}
 
 @media print {
   /* Hide UI elements during print */
@@ -161,3 +336,4 @@ body {
 
 /* Mermaid diagram container */
 .mermaid-wrapper { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+
