@@ -3,7 +3,7 @@
 import { useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
-const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const SESSION_DURATION_MS = 5 * 60 * 60 * 1000; // 5 hours (must match JWT_EXPIRES_IN in lib/auth.ts)
 
 export function SessionGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
