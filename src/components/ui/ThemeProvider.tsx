@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "light" | "dark" | "offwhite" | "dim" | "system";
+type Theme = "light" | "dark" | "claude" | "system";
 
 type ThemeContextType = {
   theme: Theme;
   setTheme: (t: Theme) => void;
-  resolvedTheme: "light" | "dark" | "offwhite" | "dim";
+  resolvedTheme: "light" | "dark" | "claude";
 };
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
@@ -22,7 +22,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
 
-  const resolvedTheme: "light" | "dark" | "offwhite" | "dim" =
+  const resolvedTheme: "light" | "dark" | "claude" =
     theme === "system" ? (systemIsDark ? "dark" : "light") : theme;
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.remove("dark", "offwhite", "dim");
+    document.documentElement.classList.remove("dark", "claude");
     if (resolvedTheme !== "light") {
       document.documentElement.classList.add(resolvedTheme);
     }

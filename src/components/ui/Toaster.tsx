@@ -7,9 +7,7 @@ export function Toaster() {
   const { resolvedTheme } = useTheme();
 
   const sonnerTheme =
-    resolvedTheme === "dim" || resolvedTheme === "offwhite"
-      ? "light"
-      : resolvedTheme;
+    resolvedTheme === "claude" ? "dark" : resolvedTheme;
 
   return (
     <SonnerToaster

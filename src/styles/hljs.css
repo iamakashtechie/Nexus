@@ -76,40 +76,40 @@ code.hljs {
   font-weight: bold;
 }
 
-/* Dark and Dim mode syntax highlighting overrides */
-.dark .hljs, .dim .hljs {
+/* Dark and Claude mode syntax highlighting overrides */
+.dark .hljs, .claude .hljs {
   color: var(--code-text, #c9d1d9);
   background: var(--code-bg, #0d1117);
 }
 .dark .hljs-doctag, .dark .hljs-keyword, .dark .hljs-meta .hljs-keyword, .dark .hljs-template-tag, .dark .hljs-template-variable, .dark .hljs-type, .dark .hljs-variable.language_,
-.dim .hljs-doctag, .dim .hljs-keyword, .dim .hljs-meta .hljs-keyword, .dim .hljs-template-tag, .dim .hljs-template-variable, .dim .hljs-type, .dim .hljs-variable.language_ {
+.claude .hljs-doctag, .claude .hljs-keyword, .claude .hljs-meta .hljs-keyword, .claude .hljs-template-tag, .claude .hljs-template-variable, .claude .hljs-type, .claude .hljs-variable.language_ {
   color: #ff7b72;
 }
 .dark .hljs-title, .dark .hljs-title.class_, .dark .hljs-title.class_.inherited__, .dark .hljs-title.function_,
-.dim .hljs-title, .dim .hljs-title.class_, .dim .hljs-title.class_.inherited__, .dim .hljs-title.function_ {
+.claude .hljs-title, .claude .hljs-title.class_, .claude .hljs-title.class_.inherited__, .claude .hljs-title.function_ {
   color: #d2a8ff;
 }
 .dark .hljs-attr, .dark .hljs-attribute, .dark .hljs-literal, .dark .hljs-meta, .dark .hljs-number, .dark .hljs-operator, .dark .hljs-variable, .dark .hljs-selector-attr, .dark .hljs-selector-class, .dark .hljs-selector-id,
-.dim .hljs-attr, .dim .hljs-attribute, .dim .hljs-literal, .dim .hljs-meta, .dim .hljs-number, .dim .hljs-operator, .dim .hljs-variable, .dim .hljs-selector-attr, .dim .hljs-selector-class, .dim .hljs-selector-id {
+.claude .hljs-attr, .claude .hljs-attribute, .claude .hljs-literal, .claude .hljs-meta, .claude .hljs-number, .claude .hljs-operator, .claude .hljs-variable, .claude .hljs-selector-attr, .claude .hljs-selector-class, .claude .hljs-selector-id {
   color: #79c0ff;
 }
 .dark .hljs-regexp, .dark .hljs-string, .dark .hljs-meta .hljs-string,
-.dim .hljs-regexp, .dim .hljs-string, .dim .hljs-meta .hljs-string {
+.claude .hljs-regexp, .claude .hljs-string, .claude .hljs-meta .hljs-string {
   color: #a5d6ff;
 }
 .dark .hljs-built_in, .dark .hljs-symbol,
-.dim .hljs-built_in, .dim .hljs-symbol {
+.claude .hljs-built_in, .claude .hljs-symbol {
   color: #ffa657;
 }
 .dark .hljs-comment, .dark .hljs-code, .dark .hljs-formula,
-.dim .hljs-comment, .dim .hljs-code, .dim .hljs-formula {
+.claude .hljs-comment, .claude .hljs-code, .claude .hljs-formula {
   color: #8b949e;
 }
 .dark .hljs-name, .dark .hljs-quote, .dark .hljs-selector-tag, .dark .hljs-selector-pseudo,
-.dim .hljs-name, .dim .hljs-quote, .dim .hljs-selector-tag, .dim .hljs-selector-pseudo {
+.claude .hljs-name, .claude .hljs-quote, .claude .hljs-selector-tag, .claude .hljs-selector-pseudo {
   color: #7ee787;
 }
-.dark .hljs-subst, .dim .hljs-subst {
+.dark .hljs-subst, .claude .hljs-subst {
   color: #c9d1d9;
 }
 

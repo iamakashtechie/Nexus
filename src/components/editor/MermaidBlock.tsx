@@ -23,7 +23,7 @@ function ensureMermaidInit(theme: "light" | "dark" | "default" = "default") {
 function readColorScheme(): "light" | "dark" {
   if (typeof window === "undefined") return "light";
   const html = document.documentElement;
-  if (html.classList.contains("dark") || html.classList.contains("dim")) {
+  if (html.classList.contains("dark") || html.classList.contains("claude")) {
     return "dark";
   }
   return "light";
