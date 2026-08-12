@@ -30,6 +30,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("nexus_theme")||"dark";if(t==="system"){t=window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}if(t==="dark"||t==="claude"){document.documentElement.classList.add(t)}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased`} suppressHydrationWarning>
         <ServiceWorkerRegistrar />
         <ThemeProvider>
