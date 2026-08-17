@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FilePlus } from "lucide-react";
+import { FilePlus, Archive } from "lucide-react";
 import { ContextMenu, type MenuItem } from "@/components/ui/ContextMenu";
 import { BottomSheet, type SheetItem } from "@/components/ui/BottomSheet";
 import { ConfirmDialog } from "@/components/ui/Dialog";
@@ -154,6 +154,14 @@ export default function NotesPage() {
     },
     [downloadFile]
   );
+
+  const handleDownloadAllNotes = useCallback(() => {
+    void downloadFile(
+      '/api/notes/download',
+      'nexus-backup.zip',
+      'Backup download started.'
+    );
+  }, [downloadFile]);
 
   const buildNoteContextMenu = useCallback(
     (note: NoteWithTags, rect?: DOMRect): MenuItem[] => [
@@ -514,6 +522,14 @@ export default function NotesPage() {
             >
               <FilePlus size={14} />
               Create Note
+            </button>
+            <div className="w-8 h-[1px] bg-border/50 my-1"></div>
+            <button
+              onClick={handleDownloadAllNotes}
+              className="px-4 py-2 rounded-md transition-all hover:bg-surface-hover text-muted hover:text-text font-medium flex items-center gap-2 text-[13px]"
+            >
+              <Archive size={14} />
+              Download All Notes
             </button>
           </div>
         )}

@@ -3,7 +3,8 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
-import { Editor as TiptapEditor } from "@tiptap/core";
+import Heading from "@tiptap/extension-heading";
+import { mergeAttributes, Editor as TiptapEditor } from "@tiptap/core";
 import { CodeBlockWithMermaidExtension } from "./MermaidCodeBlock";
 import { WikiLink } from "./extensions/WikiLink";
 import {
@@ -19,6 +20,25 @@ import { useEffect, useCallback, useRef, useState } from "react";
 import { getLowlight } from "@/lib/highlight";
 
 const lowlight = getLowlight();
+
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+const CustomHeading = Heading.extend({
+  renderHTML({ node, HTMLAttributes }) {
+    const hasLevel = this.options.levels.includes(node.attrs.level);
+    const level = hasLevel ? node.attrs.level : this.options.levels[0];
+    const textContent = node.textContent;
+    const id = slugify(textContent);
+    
+    return [
+      `h${level}`,
+      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { id }),
+      0,
+    ];
+  },
+});
 
 type EditorProps = {
   content: object;
@@ -49,7 +69,8 @@ export default function Editor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit.configure({ codeBlock: false }),
+      StarterKit.configure({ codeBlock: false, heading: false }),
+      CustomHeading,
       Link.configure({
         openOnClick: false,
         autolink: false,

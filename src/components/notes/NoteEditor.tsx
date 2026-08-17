@@ -22,6 +22,7 @@ import {
   type SlashItem,
 } from "@/components/editor/SuggestionMenus";
 import { useApi } from "@/hooks/useApi";
+import { TableOfContents } from "@/components/editor/TableOfContents";
 import type { NoteWithTags } from "@/types";
 import type { Editor as TiptapEditor } from "@tiptap/core";
 import { FileText, CornerDownLeft, Copy, Check } from "lucide-react";
@@ -128,6 +129,20 @@ function renderWikiLinks(
   return children;
 }
 
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function extractText(children: React.ReactNode): string {
+  if (typeof children === 'string') return children;
+  if (Array.isArray(children)) return children.map(extractText).join('');
+  if (React.isValidElement(children)) {
+    const props = children.props as { children?: React.ReactNode };
+    if (props.children) return extractText(props.children);
+  }
+  return '';
+}
+
 type NoteEditorProps = {
   note: NoteWithTags;
   isEditing: boolean;
@@ -164,6 +179,7 @@ export function NoteEditor({
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [editorInstance, setEditorInstance] = useState<TiptapEditor | null>(null);
   const [copied, setCopied] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = useCallback(async () => {
     const textToCopy = isMarkdownNote
@@ -418,7 +434,7 @@ export function NoteEditor({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
-      <div className="flex-1 overflow-y-auto relative">
+      <div className="flex-1 overflow-y-auto relative" ref={scrollContainerRef}>
         <div className="sticky top-3 right-4 z-30 float-right mr-4 mt-2 pointer-events-none">
           <button
             type="button"
@@ -581,12 +597,12 @@ export function NoteEditor({
                         p: ({ children }) => <p>{renderWikiLinks(children, onWikiLinkClick)}</p>,
                         li: ({ children }) => <li>{renderWikiLinks(children, onWikiLinkClick)}</li>,
                         blockquote: ({ children }) => <blockquote>{renderWikiLinks(children, onWikiLinkClick)}</blockquote>,
-                        h1: ({ children }) => <h1>{renderWikiLinks(children, onWikiLinkClick)}</h1>,
-                        h2: ({ children }) => <h2>{renderWikiLinks(children, onWikiLinkClick)}</h2>,
-                        h3: ({ children }) => <h3>{renderWikiLinks(children, onWikiLinkClick)}</h3>,
-                        h4: ({ children }) => <h4>{renderWikiLinks(children, onWikiLinkClick)}</h4>,
-                        h5: ({ children }) => <h5>{renderWikiLinks(children, onWikiLinkClick)}</h5>,
-                        h6: ({ children }) => <h6>{renderWikiLinks(children, onWikiLinkClick)}</h6>,
+                        h1: ({ children }) => { const id = slugify(extractText(children)); return <h1 id={id}>{renderWikiLinks(children, onWikiLinkClick)}</h1>; },
+                        h2: ({ children }) => { const id = slugify(extractText(children)); return <h2 id={id}>{renderWikiLinks(children, onWikiLinkClick)}</h2>; },
+                        h3: ({ children }) => { const id = slugify(extractText(children)); return <h3 id={id}>{renderWikiLinks(children, onWikiLinkClick)}</h3>; },
+                        h4: ({ children }) => { const id = slugify(extractText(children)); return <h4 id={id}>{renderWikiLinks(children, onWikiLinkClick)}</h4>; },
+                        h5: ({ children }) => { const id = slugify(extractText(children)); return <h5 id={id}>{renderWikiLinks(children, onWikiLinkClick)}</h5>; },
+                        h6: ({ children }) => { const id = slugify(extractText(children)); return <h6 id={id}>{renderWikiLinks(children, onWikiLinkClick)}</h6>; },
                         table: ({ children }) => (
                           <div className="my-5 w-full overflow-x-auto rounded-xl border border-border/60 bg-surface/40 shadow-sm">
                             <table className="w-full min-w-max text-left border-collapse text-sm">{children}</table>
@@ -660,6 +676,13 @@ export function NoteEditor({
           </div>
         </div>
       </div>
+
+      <TableOfContents 
+        isMarkdown={isMarkdownNote}
+        markdownContent={markdownValue}
+        richContent={note.content as object}
+        scrollContainerRef={scrollContainerRef}
+      />
 
       <BacklinksPanel activeNote={note} onSelect={onSelectBacklink} />
       <FrontmatterPanel
