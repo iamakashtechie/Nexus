@@ -66,7 +66,6 @@ export async function GET(req: NextRequest) {
         notebook: true,
       },
       orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],
-      take: 20,
     });
 
     return NextResponse.json({ success: true, data: notes });
