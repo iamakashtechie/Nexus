@@ -102,7 +102,8 @@ export default function NotesPage() {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
       localStorage.removeItem("nexus_token");
-      router.push("/login");
+      localStorage.removeItem("nexus_login_at");
+      router.replace("/login");
     }
   }, [router]);
 

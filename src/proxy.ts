@@ -34,7 +34,10 @@ export async function proxy(request: NextRequest) {
   // 1. If user is accessing public routes (like /login)
   if (isAuthRoute) {
     if (isValidSession) {
-      return NextResponse.redirect(new URL('/notes', request.url));
+      const response = NextResponse.redirect(new URL('/notes', request.url));
+      // Prevent browser from caching the login page (bfcache)
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      return response;
     }
     return NextResponse.next();
   }
@@ -71,6 +74,6 @@ export const config = {
      * - manifest.* (manifest files)
      * - static assets
      */
-    '/((?!_next/static|_next/image|favicon.ico|manifest\\.|icon|apple-icon).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest\\.|icon|apple-icon|sw\\.js).*)',
   ],
 };

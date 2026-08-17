@@ -21,6 +21,7 @@ export function useApi() {
 
     if (res.status === 401) {
       localStorage.removeItem("nexus_token");
+      localStorage.removeItem("nexus_login_at");
       window.location.href = "/login";
       throw new Error("Unauthorized");
     }

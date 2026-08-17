@@ -15,7 +15,7 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
     if (!token || !loginAt) {
       localStorage.removeItem("nexus_token");
       localStorage.removeItem("nexus_login_at");
-      router.push("/login");
+      router.replace("/login");
       return false;
     }
 
@@ -23,7 +23,7 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
     if (elapsed >= SESSION_DURATION_MS) {
       localStorage.removeItem("nexus_token");
       localStorage.removeItem("nexus_login_at");
-      router.push("/login");
+      router.replace("/login");
       return false;
     }
 

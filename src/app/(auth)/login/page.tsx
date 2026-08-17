@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+
+const SESSION_DURATION_MS = 5 * 60 * 60 * 1000; // 5 hours (must match JWT_EXPIRES_IN in lib/auth.ts)
 
 export default function LoginPage() {
   const router = useRouter();
@@ -9,6 +11,41 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Check if user is already authenticated (covers browser back button / bfcache)
+  const redirectIfAuthenticated = useCallback(() => {
+    const token = localStorage.getItem("nexus_token");
+    const loginAt = localStorage.getItem("nexus_login_at");
+
+    if (token && loginAt) {
+      const elapsed = Date.now() - parseInt(loginAt, 10);
+      if (elapsed < SESSION_DURATION_MS) {
+        // Replace the current history entry so back button can't loop
+        window.history.replaceState(null, "", "/notes");
+        router.replace("/notes");
+      }
+    }
+  }, [router]);
+
+  useEffect(() => {
+    // Check on mount (handles direct navigation and bfcache restore)
+    redirectIfAuthenticated();
+
+    // Also check on popstate (browser back/forward button)
+    const handlePopState = () => redirectIfAuthenticated();
+    window.addEventListener("popstate", handlePopState);
+
+    // Handle page becoming visible again (bfcache in Safari/Chrome)
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) redirectIfAuthenticated();
+    };
+    window.addEventListener("pageshow", handlePageShow);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, [redirectIfAuthenticated]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -32,7 +69,8 @@ export default function LoginPage() {
       // Store token for API calls
       localStorage.setItem("nexus_token", data.token);
       localStorage.setItem("nexus_login_at", Date.now().toString());
-      router.push("/notes");
+      // Use replace so /login doesn't stay in browser history
+      router.replace("/notes");
     } catch {
       setError("Something went wrong. Try again.");
     } finally {

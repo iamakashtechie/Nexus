@@ -28,6 +28,7 @@ export function useDownload() {
       });
       if (res.status === 401) {
         localStorage.removeItem("nexus_token");
+        localStorage.removeItem("nexus_login_at");
         window.location.href = "/login";
         return;
       }
