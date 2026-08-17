@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
-import { List, ChevronRight } from "lucide-react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { List, X } from "lucide-react";
 
 export function slugify(text: string): string {
   return text.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-+|-+$/g, '');
@@ -15,95 +15,127 @@ export function extractTextFromRichContentNode(node: any): string {
   return childText;
 }
 
-type HeadingNode = {
+export type HeadingNode = {
   id: string;
   text: string;
   level: number;
 };
+
+export function extractHeadings(
+  isMarkdown: boolean,
+  markdownContent: string,
+  richContent: object | null
+): HeadingNode[] {
+  const results: HeadingNode[] = [];
+  if (isMarkdown) {
+    if (!markdownContent) return results;
+    const lines = markdownContent.split('\n');
+    let inCodeBlock = false;
+    
+    lines.forEach(line => {
+      if (line.trim().startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+        return;
+      }
+      if (inCodeBlock) return;
+      
+      const match = line.match(/^(#{1,6})\s+(.+)$/);
+      if (match) {
+        const level = match[1].length;
+        let text = match[2].trim();
+        
+        // Strip basic markdown formatting for the TOC label
+        text = text.replace(/\*\*(.*?)\*\*/g, '$1');
+        text = text.replace(/\*(.*?)\*/g, '$1');
+        text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+        text = text.replace(/\[\[(.*?)\]\]/g, '$1');
+
+        results.push({
+          id: slugify(text),
+          text,
+          level
+        });
+      }
+    });
+  } else {
+    if (!richContent || typeof richContent !== 'object') return results;
+    
+    const traverse = (node: any) => {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'heading') {
+        const level = Number(node.attrs?.level || 1);
+        const text = extractTextFromRichContentNode(node);
+        if (text.trim()) {
+          results.push({
+            id: slugify(text.trim()),
+            text: text.trim(),
+            level
+          });
+        }
+      } else if (Array.isArray(node.content)) {
+        node.content.forEach(traverse);
+      }
+    };
+    traverse(richContent);
+  }
+  return results;
+}
 
 type TableOfContentsProps = {
   isMarkdown: boolean;
   markdownContent: string;
   richContent: object | null;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onOpen?: () => void;
 };
 
 export function TableOfContents({
   isMarkdown,
   markdownContent,
   richContent,
-  scrollContainerRef
+  scrollContainerRef,
+  isOpen: controlledIsOpen,
+  onClose,
+  onOpen,
 }: TableOfContentsProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [activeId, setActiveId] = useState<string>("");
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
+  const isControlled = typeof controlledIsOpen === "boolean";
+  const isOpen = isControlled ? controlledIsOpen : internalIsOpen;
+
+  const handleClose = () => {
+    if (isControlled && onClose) {
+      onClose();
+    } else {
+      setInternalIsOpen(false);
+    }
+  };
+
+  const handleOpen = () => {
+    if (isControlled && onOpen) {
+      onOpen();
+    } else {
+      setInternalIsOpen(true);
+    }
+  };
+
+  // Close on Escape key press
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setIsOpen(true);
-      } else {
-        setIsOpen(false);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        handleClose();
       }
     };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isControlled]);
 
   const headings = useMemo(() => {
-    const results: HeadingNode[] = [];
-    if (isMarkdown) {
-      if (!markdownContent) return results;
-      const lines = markdownContent.split('\n');
-      let inCodeBlock = false;
-      
-      lines.forEach(line => {
-        if (line.trim().startsWith('```')) {
-          inCodeBlock = !inCodeBlock;
-          return;
-        }
-        if (inCodeBlock) return;
-        
-        const match = line.match(/^(#{1,6})\s+(.+)$/);
-        if (match) {
-          const level = match[1].length;
-          let text = match[2].trim();
-          
-          // Basic stripping of bold/italic/links for the TOC display text
-          text = text.replace(/\*\*(.*?)\*\*/g, '$1');
-          text = text.replace(/\*(.*?)\*/g, '$1');
-          text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-          text = text.replace(/\[\[(.*?)\]\]/g, '$1');
-
-          results.push({
-            id: slugify(text),
-            text,
-            level
-          });
-        }
-      });
-    } else {
-      if (!richContent || typeof richContent !== 'object') return results;
-      
-      const traverse = (node: any) => {
-        if (!node || typeof node !== 'object') return;
-        if (node.type === 'heading') {
-          const level = Number(node.attrs?.level || 1);
-          const text = extractTextFromRichContentNode(node);
-          if (text.trim()) {
-            results.push({
-              id: slugify(text.trim()),
-              text: text.trim(),
-              level
-            });
-          }
-        } else if (Array.isArray(node.content)) {
-          node.content.forEach(traverse);
-        }
-      };
-      traverse(richContent);
-    }
-    return results;
+    return extractHeadings(isMarkdown, markdownContent, richContent);
   }, [isMarkdown, markdownContent, richContent]);
 
   useEffect(() => {
@@ -112,7 +144,6 @@ export function TableOfContents({
     const container = scrollContainerRef.current;
     if (!container) return;
     
-    let observer: IntersectionObserver | null = null;
     let scrollTimeout: NodeJS.Timeout;
 
     const handleScroll = () => {
@@ -128,11 +159,9 @@ export function TableOfContents({
         for (const heading of headings) {
           const element = document.getElementById(heading.id);
           if (element) {
-            // Calculate distance to the top third of the scroll container
             const offsetTop = element.offsetTop;
             const distance = Math.abs(offsetTop - scrollY - (containerHeight / 3));
             
-            // Allow a reasonably close heading to be active
             if (offsetTop <= scrollY + containerHeight / 2) {
               if (distance < minDistance) {
                 minDistance = distance;
@@ -142,7 +171,6 @@ export function TableOfContents({
           }
         }
         
-        // Fallback: If we didn't find one, maybe we scrolled very far down and the last active heading is way above
         if (!currentActiveId) {
           for (let i = headings.length - 1; i >= 0; i--) {
             const element = document.getElementById(headings[i].id);
@@ -153,7 +181,6 @@ export function TableOfContents({
           }
         }
         
-        // One more fallback: just pick the first heading if it's the only one or at the top
         if (!currentActiveId && headings.length > 0) {
           currentActiveId = headings[0].id;
         }
@@ -177,31 +204,46 @@ export function TableOfContents({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`fixed right-4 top-24 z-40 p-2 rounded-lg bg-surface shadow-md border border-border/60 text-muted hover:text-text hover:bg-surface-hover transition-all flex items-center justify-center max-lg:flex ${isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'} lg:hidden`}
-        title="Table of Contents"
-      >
-        <List size={18} />
-      </button>
+      {/* Uncontrolled floating button (only rendered if component is not externally controlled) */}
+      {!isControlled && !isOpen && (
+        <button
+          type="button"
+          onClick={handleOpen}
+          className="fixed right-4 top-24 z-40 p-2.5 rounded-xl bg-surface/90 backdrop-blur-md shadow-lg border border-border text-muted hover:text-text hover:bg-surface-hover hover:border-border/80 transition-all flex items-center justify-center cursor-pointer active:scale-95"
+          title="Table of Contents"
+          aria-label="Table of Contents"
+        >
+          <List size={18} />
+        </button>
+      )}
       
-      <div 
-        className={`absolute top-0 right-0 h-full z-30 transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
-      >
-        <div className="sticky top-0 h-full max-h-full w-60 bg-surface/80 backdrop-blur-sm border-l border-border/60 flex flex-col pt-6 pb-20 shadow-xl lg:shadow-none">
-          <div className="px-5 mb-4 flex items-center justify-between">
-            <span className="text-[10px] font-bold tracking-wider uppercase text-muted">On this page</span>
+      {/* Floating Drawer / Card */}
+      {isOpen && (
+        <div 
+          ref={panelRef}
+          className="fixed right-4 top-24 z-40 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[50vh] flex flex-col bg-surface/95 backdrop-blur-md rounded-xl border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        >
+          {/* Header */}
+          <div className="px-4 py-2.5 border-b border-border/50 flex items-center justify-between shrink-0 bg-surface/60">
+            <div className="flex items-center gap-2">
+              <List size={14} className="text-muted" />
+              <span className="text-[10px] font-bold tracking-wider uppercase text-muted">
+                On this page ({headings.length})
+              </span>
+            </div>
             <button 
               type="button"
-              onClick={() => setIsOpen(false)}
-              className="p-1 rounded-md text-muted hover:text-text hover:bg-surface-hover lg:hidden"
+              onClick={handleClose}
+              className="p-1 rounded-md text-muted hover:text-text hover:bg-surface-hover transition-colors cursor-pointer"
+              title="Close Table of Contents"
+              aria-label="Close Table of Contents"
             >
-              <ChevronRight size={14} />
+              <X size={15} />
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-1.5 scrollbar-hide">
+          {/* Hierarchically Indented Scrollable List */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5 scrollbar-thin">
             {headings.map((heading, i) => (
               <a
                 key={`${heading.id}-${i}`}
@@ -218,21 +260,21 @@ export function TableOfContents({
                     setActiveId(heading.id);
                   }
                 }}
-                className={`block text-[12px] py-0.5 transition-colors relative border-l-2 pl-3 ${
+                className={`block text-[12px] py-1 transition-colors relative border-l-2 pl-3 ${
                   activeId === heading.id 
                     ? 'text-text font-medium border-accent' 
                     : 'text-muted hover:text-text border-transparent hover:border-border/60'
                 }`}
                 style={{
-                  marginLeft: `${Math.max(0, (heading.level - 1) * 12)}px`
+                  marginLeft: `${Math.max(0, (heading.level - 1) * 14)}px`
                 }}
               >
-                {heading.text}
+                <span className="line-clamp-2 leading-relaxed">{heading.text}</span>
               </a>
             ))}
           </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

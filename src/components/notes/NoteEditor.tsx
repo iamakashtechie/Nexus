@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { normalizeFileType, normalizeNoteTitle, resolveNoteFileType } from "@/lib/fileType";
 import { EditorSkeleton } from "@/components/ui/Skeleton";
 import { FindInNote } from "@/components/editor/FindInNote";
@@ -22,10 +22,10 @@ import {
   type SlashItem,
 } from "@/components/editor/SuggestionMenus";
 import { useApi } from "@/hooks/useApi";
-import { TableOfContents } from "@/components/editor/TableOfContents";
+import { TableOfContents, extractHeadings } from "@/components/editor/TableOfContents";
 import type { NoteWithTags } from "@/types";
 import type { Editor as TiptapEditor } from "@tiptap/core";
-import { FileText, CornerDownLeft, Copy, Check } from "lucide-react";
+import { FileText, CornerDownLeft, Copy, Check, List } from "lucide-react";
 import { MermaidDiagram } from "@/components/editor/MermaidBlock";
 import { CodeBlock } from "@/components/editor/CodeBlock";
 
@@ -179,7 +179,13 @@ export function NoteEditor({
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [editorInstance, setEditorInstance] = useState<TiptapEditor | null>(null);
   const [copied, setCopied] = useState(false);
+  const [tocOpen, setTocOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const headings = useMemo(() => {
+    return extractHeadings(isMarkdownNote, markdownValue, note.content as object);
+  }, [isMarkdownNote, markdownValue, note.content]);
+  const hasHeadings = headings.length > 0;
 
   const handleCopy = useCallback(async () => {
     const textToCopy = isMarkdownNote
@@ -435,7 +441,7 @@ export function NoteEditor({
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
       <div className="flex-1 overflow-y-auto relative" ref={scrollContainerRef}>
-        <div className="sticky top-3 right-4 z-30 float-right mr-4 mt-2 pointer-events-none">
+        <div className="sticky top-3 right-4 z-30 float-right mr-4 mt-2 pointer-events-none flex flex-col items-end gap-2">
           <button
             type="button"
             onClick={handleCopy}
@@ -454,6 +460,18 @@ export function NoteEditor({
               </>
             )}
           </button>
+
+          {hasHeadings && !tocOpen && (
+            <button
+              type="button"
+              onClick={() => setTocOpen(true)}
+              title="Table of Contents"
+              className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface/90 backdrop-blur border border-border/80 text-muted hover:text-text hover:bg-surface-hover hover:border-border shadow-md transition-all text-xs font-medium cursor-pointer active:scale-95"
+            >
+              <List size={14} className="shrink-0" />
+              <span className="text-[11px] font-medium hidden sm:inline">Outline</span>
+            </button>
+          )}
         </div>
         <div className="max-w-5xl mx-auto w-full pt-4 min-h-full flex flex-col">
           <div className="px-5 md:px-8 w-full">
@@ -682,6 +700,9 @@ export function NoteEditor({
         markdownContent={markdownValue}
         richContent={note.content as object}
         scrollContainerRef={scrollContainerRef}
+        isOpen={tocOpen}
+        onClose={() => setTocOpen(false)}
+        onOpen={() => setTocOpen(true)}
       />
 
       <BacklinksPanel activeNote={note} onSelect={onSelectBacklink} />
